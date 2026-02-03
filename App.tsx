@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -31,6 +31,334 @@ import { CVData, WorkExperience, Education, CVTemplate, SectionTitles } from './
 import { optimizeText } from './services/geminiService';
 
 declare var html2pdf: any;
+
+type Language = 'it' | 'pt' | 'en' | 'es';
+
+const STORAGE_KEY = 'cv_editor_data_v1';
+
+const LOCALES: Record<Language, {
+  label: string;
+  sectionTitles: SectionTitles;
+  defaults: {
+    experience: { company: string; role: string; period: string; description: string };
+    education: { school: string; degree: string; year: string };
+    listItems: { skills: string; languages: string; softSkills: string };
+    websiteLabel: string;
+  };
+  template: {
+    curriculumTitle: string;
+    statusLabel: string;
+    roleLabel: string;
+    availableForHire: string;
+    stackLabel: string;
+    networkLabel: string;
+    emailLabel: string;
+  };
+  ui: {
+    language: string;
+    save: string;
+    saved: string;
+    clickToEdit: string;
+    addTab: string;
+    removeTab: string;
+    addExperience: string;
+    addEducation: string;
+    addSkills: string;
+    addLanguages: string;
+    addSoftSkills: string;
+    experiencesLabel: string;
+    educationLabel: string;
+    skillsLabel: string;
+    languagesLabel: string;
+    softSkillsLabel: string;
+    emptyExperience: string;
+    emptyEducation: string;
+    emptySkills: string;
+    emptyLanguages: string;
+    emptySoftSkills: string;
+    emptySkillFallback: string;
+    emptyLanguageFallback: string;
+    emptySoftSkillFallback: string;
+    privacyNote: string;
+  };
+}> = {
+  it: {
+    label: 'Italiano',
+    sectionTitles: {
+      experience: "Esperienze Lavorative",
+      education: "Istruzione",
+      skills: "Competenze Tecniche",
+      languages: "Lingue",
+      softSkills: "Soft Skills",
+      summary: "Profilo Professionale",
+      contact: "Contatti",
+      social: "Web & Social",
+      personalInfo: "Anagrafica"
+    },
+    defaults: {
+      experience: {
+        company: "Nuova Azienda",
+        role: "Ruolo",
+        period: "2024 - Presente",
+        description: "Descrizione delle attività..."
+      },
+      education: {
+        school: "Nome Istituto",
+        degree: "Titolo di Studio",
+        year: "2024"
+      },
+      listItems: {
+        skills: "Nuova competenza",
+        languages: "Nuova lingua",
+        softSkills: "Nuova soft skill"
+      },
+      websiteLabel: "Sito Web"
+    },
+    template: {
+      curriculumTitle: "Curriculum Vitae",
+      statusLabel: "Stato",
+      roleLabel: "Ruolo",
+      availableForHire: "disponibile_per_assunzione",
+      stackLabel: "Stack",
+      networkLabel: "Rete",
+      emailLabel: "email"
+    },
+    ui: {
+      language: "Lingua",
+      save: "Salva nel browser",
+      saved: "Salvato",
+      clickToEdit: "CLICCA DIRETTAMENTE SULLA CARTA PER MODIFICARE",
+      addTab: "Aggiungi",
+      removeTab: "Rimuovi",
+      addExperience: "Esperienza",
+      addEducation: "Istruzione",
+      addSkills: "Competenze",
+      addLanguages: "Lingue",
+      addSoftSkills: "Soft Skills",
+      experiencesLabel: "Esperienze",
+      educationLabel: "Istruzione",
+      skillsLabel: "Competenze",
+      languagesLabel: "Lingue",
+      softSkillsLabel: "Soft Skills",
+      emptyExperience: "Nessuna esperienza",
+      emptyEducation: "Nessuna istruzione",
+      emptySkills: "Nessuna competenza",
+      emptyLanguages: "Nessuna lingua",
+      emptySoftSkills: "Nessuna soft skill",
+      emptySkillFallback: "Competenza vuota",
+      emptyLanguageFallback: "Lingua vuota",
+      emptySoftSkillFallback: "Soft skill vuota",
+      privacyNote: "Autorizzo il trattamento dei miei dati personali ai sensi del Dlgs 196 del 30 giugno 2003 e dell'art. 13 GDPR ai fini della ricerca e selezione del personale."
+    }
+  },
+  pt: {
+    label: 'Português',
+    sectionTitles: {
+      experience: "Experiências Profissionais",
+      education: "Formação",
+      skills: "Competências",
+      languages: "Idiomas",
+      softSkills: "Soft Skills",
+      summary: "Resumo Profissional",
+      contact: "Contato",
+      social: "Web & Social",
+      personalInfo: "Dados Pessoais"
+    },
+    defaults: {
+      experience: {
+        company: "Nova Empresa",
+        role: "Cargo",
+        period: "2024 - Presente",
+        description: "Descrição das atividades..."
+      },
+      education: {
+        school: "Nome da Instituição",
+        degree: "Grau",
+        year: "2024"
+      },
+      listItems: {
+        skills: "Nova competência",
+        languages: "Novo idioma",
+        softSkills: "Nova soft skill"
+      },
+      websiteLabel: "Site"
+    },
+    template: {
+      curriculumTitle: "Currículo Vitae",
+      statusLabel: "Status",
+      roleLabel: "Cargo",
+      availableForHire: "disponível_para_contratação",
+      stackLabel: "Stack",
+      networkLabel: "Rede",
+      emailLabel: "email"
+    },
+    ui: {
+      language: "Idioma",
+      save: "Salvar no navegador",
+      saved: "Salvo",
+      clickToEdit: "CLIQUE DIRETAMENTE NO CURRÍCULO PARA EDITAR",
+      addTab: "Adicionar",
+      removeTab: "Apagar",
+      addExperience: "Experiência",
+      addEducation: "Formação",
+      addSkills: "Competências",
+      addLanguages: "Idiomas",
+      addSoftSkills: "Soft Skills",
+      experiencesLabel: "Experiências",
+      educationLabel: "Formação",
+      skillsLabel: "Competências",
+      languagesLabel: "Idiomas",
+      softSkillsLabel: "Soft Skills",
+      emptyExperience: "Nenhuma experiência",
+      emptyEducation: "Nenhuma formação",
+      emptySkills: "Nenhuma competência",
+      emptyLanguages: "Nenhum idioma",
+      emptySoftSkills: "Nenhuma soft skill",
+      emptySkillFallback: "Competência vazia",
+      emptyLanguageFallback: "Idioma vazio",
+      emptySoftSkillFallback: "Soft skill vazia",
+      privacyNote: "Autorizo o tratamento dos meus dados pessoais nos termos do Decreto Legislativo 196 de 30 de junho de 2003 e do art. 13 do GDPR para fins de recrutamento e seleção."
+    }
+  },
+  en: {
+    label: 'English',
+    sectionTitles: {
+      experience: "Work Experience",
+      education: "Education",
+      skills: "Skills",
+      languages: "Languages",
+      softSkills: "Soft Skills",
+      summary: "Professional Summary",
+      contact: "Contact",
+      social: "Web & Social",
+      personalInfo: "Personal Info"
+    },
+    defaults: {
+      experience: {
+        company: "New Company",
+        role: "Role",
+        period: "2024 - Present",
+        description: "Description of activities..."
+      },
+      education: {
+        school: "School Name",
+        degree: "Degree",
+        year: "2024"
+      },
+      listItems: {
+        skills: "New skill",
+        languages: "New language",
+        softSkills: "New soft skill"
+      },
+      websiteLabel: "Website"
+    },
+    template: {
+      curriculumTitle: "Curriculum Vitae",
+      statusLabel: "Status",
+      roleLabel: "Role",
+      availableForHire: "available_for_hire",
+      stackLabel: "Stack",
+      networkLabel: "Network",
+      emailLabel: "email"
+    },
+    ui: {
+      language: "Language",
+      save: "Save in browser",
+      saved: "Saved",
+      clickToEdit: "CLICK DIRECTLY ON THE CV TO EDIT",
+      addTab: "Add",
+      removeTab: "Remove",
+      addExperience: "Experience",
+      addEducation: "Education",
+      addSkills: "Skills",
+      addLanguages: "Languages",
+      addSoftSkills: "Soft Skills",
+      experiencesLabel: "Experiences",
+      educationLabel: "Education",
+      skillsLabel: "Skills",
+      languagesLabel: "Languages",
+      softSkillsLabel: "Soft Skills",
+      emptyExperience: "No experience",
+      emptyEducation: "No education",
+      emptySkills: "No skills",
+      emptyLanguages: "No languages",
+      emptySoftSkills: "No soft skills",
+      emptySkillFallback: "Empty skill",
+      emptyLanguageFallback: "Empty language",
+      emptySoftSkillFallback: "Empty soft skill",
+      privacyNote: "I authorize the processing of my personal data pursuant to Legislative Decree 196 of June 30, 2003 and Article 13 of the GDPR for recruitment and selection purposes."
+    }
+  },
+  es: {
+    label: 'Español',
+    sectionTitles: {
+      experience: "Experiencia Laboral",
+      education: "Educación",
+      skills: "Habilidades",
+      languages: "Idiomas",
+      softSkills: "Soft Skills",
+      summary: "Resumen Profesional",
+      contact: "Contacto",
+      social: "Web y Social",
+      personalInfo: "Información Personal"
+    },
+    defaults: {
+      experience: {
+        company: "Nueva Empresa",
+        role: "Puesto",
+        period: "2024 - Presente",
+        description: "Descripción de actividades..."
+      },
+      education: {
+        school: "Nombre del Instituto",
+        degree: "Título",
+        year: "2024"
+      },
+      listItems: {
+        skills: "Nueva habilidad",
+        languages: "Nuevo idioma",
+        softSkills: "Nueva soft skill"
+      },
+      websiteLabel: "Sitio web"
+    },
+    template: {
+      curriculumTitle: "Currículum Vitae",
+      statusLabel: "Estado",
+      roleLabel: "Rol",
+      availableForHire: "disponible_para_contratación",
+      stackLabel: "Stack",
+      networkLabel: "Red",
+      emailLabel: "email"
+    },
+    ui: {
+      language: "Idioma",
+      save: "Guardar en el navegador",
+      saved: "Guardado",
+      clickToEdit: "HAZ CLIC DIRECTAMENTE EN EL CV PARA EDITAR",
+      addTab: "Agregar",
+      removeTab: "Eliminar",
+      addExperience: "Experiencia",
+      addEducation: "Educación",
+      addSkills: "Habilidades",
+      addLanguages: "Idiomas",
+      addSoftSkills: "Soft Skills",
+      experiencesLabel: "Experiencias",
+      educationLabel: "Educación",
+      skillsLabel: "Habilidades",
+      languagesLabel: "Idiomas",
+      softSkillsLabel: "Soft Skills",
+      emptyExperience: "Sin experiencia",
+      emptyEducation: "Sin educación",
+      emptySkills: "Sin habilidades",
+      emptyLanguages: "Sin idiomas",
+      emptySoftSkills: "Sin soft skills",
+      emptySkillFallback: "Habilidad vacía",
+      emptyLanguageFallback: "Idioma vacío",
+      emptySoftSkillFallback: "Soft skill vacía",
+      privacyNote: "Autorizo el tratamiento de mis datos personales de acuerdo con el Decreto Legislativo 196 de 30 de junio de 2003 y el art. 13 del GDPR para fines de selección y contratación."
+    }
+  }
+};
 
 const INITIAL_DATA: CVData = {
   fullName: "Guilherme Tebaldi",
@@ -67,17 +395,7 @@ const INITIAL_DATA: CVData = {
   skills: ["React", "Java", "C#", "Render", "Vercel", "Social Media Management", "Digital Marketing"],
   languages: ["Portoghese (Madrelingua)", "Italiano"],
   softSkills: ["Problem Solving", "Focus Profondo", "Creatività", "Adattabilità"],
-  sectionTitles: {
-    experience: "Esperienze Lavorative",
-    education: "Istruzione",
-    skills: "Competenze Tecniche",
-    languages: "Lingue",
-    softSkills: "Soft Skills",
-    summary: "Profilo Professionale",
-    contact: "Contatti",
-    social: "Web & Social",
-    personalInfo: "Anagrafica"
-  }
+  sectionTitles: { ...LOCALES.it.sectionTitles }
 };
 
 const Editable: React.FC<{
@@ -269,8 +587,42 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
   const [mobileToolsTab, setMobileToolsTab] = useState<'add' | 'remove'>('add');
+  const [language, setLanguage] = useState<Language>('it');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
+
+  const locale = LOCALES[language];
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed?.data) setData(parsed.data as CVData);
+      if (Array.isArray(parsed?.modifiedFields)) {
+        setModifiedFields(new Set<string>(parsed.modifiedFields));
+      }
+      if (parsed?.language && LOCALES[parsed.language as Language]) {
+        setLanguage(parsed.language as Language);
+      }
+    } catch (err) {
+      console.error("Load Error:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    const titles = LOCALES[language].sectionTitles;
+    setData(prev => {
+      const nextTitles = { ...prev.sectionTitles };
+      (Object.keys(titles) as Array<keyof SectionTitles>).forEach(key => {
+        if (!modifiedFields.has(`title_${key}`)) {
+          nextTitles[key] = titles[key];
+        }
+      });
+      return { ...prev, sectionTitles: nextTitles };
+    });
+  }, [language, modifiedFields]);
 
   const handleUpdate = (field: keyof CVData | string, value: any) => {
     setData(prev => ({ ...prev, [field]: value } as any));
@@ -301,11 +653,7 @@ const App: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const listItemExamples: Record<'skills' | 'languages' | 'softSkills', string> = {
-    skills: "Nuova competenza",
-    languages: "Nuova lingua",
-    softSkills: "Nuova soft skill"
-  };
+  const listItemExamples = locale.defaults.listItems;
 
   const addListItem = (field: 'skills' | 'languages' | 'softSkills') => {
     setData(prev => ({ ...prev, [field]: [...prev[field], listItemExamples[field]] }));
@@ -349,10 +697,10 @@ const App: React.FC = () => {
   const addExperience = () => {
     const newExp: WorkExperience = {
       id: Date.now().toString(),
-      company: "Nuova Azienda",
-      role: "Ruolo",
-      period: "2024 - Presente",
-      description: "Descrizione delle attività..."
+      company: locale.defaults.experience.company,
+      role: locale.defaults.experience.role,
+      period: locale.defaults.experience.period,
+      description: locale.defaults.experience.description
     };
     setData(prev => ({ ...prev, experiences: [...prev.experiences, newExp] }));
   };
@@ -383,9 +731,9 @@ const App: React.FC = () => {
   const addEducation = () => {
     const newEdu: Education = {
       id: Date.now().toString(),
-      school: "Nome Istituto",
-      degree: "Titolo di Studio",
-      year: "2024"
+      school: locale.defaults.education.school,
+      degree: locale.defaults.education.degree,
+      year: locale.defaults.education.year
     };
     setData(prev => ({ ...prev, education: [...prev.education, newEdu] }));
   };
@@ -418,6 +766,23 @@ const App: React.FC = () => {
     const optimized = await optimizeText(data.summary, "Profilo professionale per un programmatore e marketer");
     handleUpdate('summary', optimized);
     setIsOptimizing(false);
+  };
+
+  const handleSaveToBrowser = () => {
+    try {
+      const payload = {
+        data,
+        modifiedFields: Array.from(modifiedFields),
+        language
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      setSaveStatus('saved');
+      window.setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err) {
+      console.error("Save Error:", err);
+      setSaveStatus('error');
+      window.setTimeout(() => setSaveStatus('idle'), 2000);
+    }
   };
 
   const handleDownloadPDF = () => {
@@ -487,7 +852,7 @@ const App: React.FC = () => {
                   <div className="bg-[#003399] w-full h-full rounded-sm flex items-center justify-center text-white font-bold text-2xl">e</div>
                 </div>
                 <div>
-                  <h1 className="text-sm font-bold tracking-widest uppercase mb-1">Curriculum Vitae</h1>
+                  <h1 className="text-sm font-bold tracking-widest uppercase mb-1">{locale.template.curriculumTitle}</h1>
                   <Editable
                     tag="h2"
                     value={data.fullName}
@@ -531,7 +896,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex items-start gap-3">
                       <Globe className="w-3 h-3 text-[#003399] mt-0.5 shrink-0" />
-                      <Editable value={data.portfolio || "Sito Web"} onChange={v => handleUpdate('portfolio', v)} isExample={!modifiedFields.has('portfolio')} />
+                      <Editable value={data.portfolio || locale.defaults.websiteLabel} onChange={v => handleUpdate('portfolio', v)} isExample={!modifiedFields.has('portfolio')} />
                     </div>
                   </div>
                 </section>
@@ -972,7 +1337,7 @@ const App: React.FC = () => {
                    <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
                 </div>
                 <h1 className="text-3xl font-bold uppercase text-emerald-100">&gt; <Editable tag="span" value={data.fullName.replace(' ', '_').toLowerCase()} onChange={v => handleUpdate('fullName', v)} isExample={!modifiedFields.has('fullName')} /></h1>
-                <p className="text-emerald-500/60 text-sm mt-1">Status: available_for_hire | Role: <Editable tag="span" value={data.role} onChange={v => handleUpdate('role', v)} isExample={!modifiedFields.has('role')} /></p>
+                <p className="text-emerald-500/60 text-sm mt-1">{locale.template.statusLabel}: {locale.template.availableForHire} | {locale.template.roleLabel}: <Editable tag="span" value={data.role} onChange={v => handleUpdate('role', v)} isExample={!modifiedFields.has('role')} /></p>
              </div>
              <div className="grid grid-cols-3 gap-8">
                 <div className="col-span-2 space-y-8">
@@ -993,15 +1358,15 @@ const App: React.FC = () => {
                 </div>
                 <div className="space-y-8">
                    <section className="bg-emerald-500/5 p-4 rounded border border-emerald-500/10">
-                      <h2 className="text-emerald-300 text-xs font-bold mb-3 uppercase tracking-tighter">Stack</h2>
+                      <h2 className="text-emerald-300 text-xs font-bold mb-3 uppercase tracking-tighter">{locale.template.stackLabel}</h2>
                       <div className="flex flex-wrap gap-2">
                          {data.skills.map((s, i) => <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} className="text-[9px] bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded border border-emerald-500/20" />)}
                       </div>
                    </section>
                    <section>
-                      <h2 className="text-emerald-300 text-xs font-bold mb-3 uppercase tracking-tighter">Network</h2>
+                      <h2 className="text-emerald-300 text-xs font-bold mb-3 uppercase tracking-tighter">{locale.template.networkLabel}</h2>
                       <div className="text-[10px] space-y-2 opacity-60">
-                         <p>email: <Editable tag="span" value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} /></p>
+                         <p>{locale.template.emailLabel}: <Editable tag="span" value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} /></p>
                          <div className="pt-2 flex flex-col gap-1">
                            {renderSocials(true)}
                          </div>
@@ -1164,7 +1529,7 @@ const App: React.FC = () => {
                   </h2>
                   <div className="space-y-2">{data.softSkills.map((skill, i) => <div key={i} className="flex items-center gap-2 text-[11px] font-bold text-slate-600"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> <Editable tag="span" value={skill} onChange={v => updateListItem('softSkills', i, v)} className="flex-1" /></div>)}</div>
                 </section>
-                <div className="pt-12"><p className="text-[9px] text-slate-400 leading-tight italic">Autorizzo il trattamento dei miei dati personali ai sensi del Dlgs 196 del 30 giugno 2003 e dell'art. 13 GDPR ai fini della ricerca e selezione del personale.</p></div>
+                <div className="pt-12"><p className="text-[9px] text-slate-400 leading-tight italic">{locale.ui.privacyNote}</p></div>
               </aside>
             </div>
           </div>
@@ -1177,47 +1542,47 @@ const App: React.FC = () => {
     if (isGeneratingPDF) return null;
 
     return (
-      <div className="md:hidden absolute bottom-4 right-4 z-20 no-print" data-html2canvas-ignore="true">
+      <div className="md:hidden fixed bottom-4 right-4 z-20 no-print" data-html2canvas-ignore="true">
         <div className={`mb-3 w-72 max-w-[90vw] rounded-2xl bg-white/95 backdrop-blur border border-slate-200 shadow-xl p-3 transition-all ${isMobileToolsOpen ? 'opacity-100 translate-y-0' : 'opacity-0 pointer-events-none translate-y-2'}`}>
           <div className="flex gap-2 mb-3">
             <button
               onClick={() => setMobileToolsTab('add')}
               className={`flex-1 text-[10px] uppercase tracking-widest font-black rounded-lg px-2 py-1.5 ${mobileToolsTab === 'add' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
             >
-              Aggiungi
+              {locale.ui.addTab}
             </button>
             <button
               onClick={() => setMobileToolsTab('remove')}
               className={`flex-1 text-[10px] uppercase tracking-widest font-black rounded-lg px-2 py-1.5 ${mobileToolsTab === 'remove' ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600'}`}
             >
-              Apagar
+              {locale.ui.removeTab}
             </button>
           </div>
 
           {mobileToolsTab === 'add' ? (
             <div className="grid gap-2">
               <button onClick={addExperience} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                Esperienza <Plus className="w-3 h-3" />
+                {locale.ui.addExperience} <Plus className="w-3 h-3" />
               </button>
               <button onClick={addEducation} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                Istruzione <Plus className="w-3 h-3" />
+                {locale.ui.addEducation} <Plus className="w-3 h-3" />
               </button>
               <button onClick={() => addListItem('skills')} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                Competenze <Plus className="w-3 h-3" />
+                {locale.ui.addSkills} <Plus className="w-3 h-3" />
               </button>
               <button onClick={() => addListItem('languages')} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                Lingue <Plus className="w-3 h-3" />
+                {locale.ui.addLanguages} <Plus className="w-3 h-3" />
               </button>
               <button onClick={() => addListItem('softSkills')} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                Soft Skills <Plus className="w-3 h-3" />
+                {locale.ui.addSoftSkills} <Plus className="w-3 h-3" />
               </button>
             </div>
           ) : (
             <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
               <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">Esperienze</p>
+                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.experiencesLabel}</p>
                 {data.experiences.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">Nessuna esperienza</p>
+                  <p className="text-[10px] text-slate-400">{locale.ui.emptyExperience}</p>
                 ) : (
                   data.experiences.map(exp => (
                     <button
@@ -1225,7 +1590,7 @@ const App: React.FC = () => {
                       onClick={() => removeExperience(exp.id)}
                       className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
                     >
-                      <span className="truncate">{exp.role || exp.company || 'Esperienza'}</span>
+                      <span className="truncate">{exp.role || exp.company || locale.ui.addExperience}</span>
                       <Trash2 className="w-3 h-3 text-red-500" />
                     </button>
                   ))
@@ -1233,9 +1598,9 @@ const App: React.FC = () => {
               </div>
 
               <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">Istruzione</p>
+                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.educationLabel}</p>
                 {data.education.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">Nessuna istruzione</p>
+                  <p className="text-[10px] text-slate-400">{locale.ui.emptyEducation}</p>
                 ) : (
                   data.education.map(edu => (
                     <button
@@ -1243,7 +1608,7 @@ const App: React.FC = () => {
                       onClick={() => removeEducation(edu.id)}
                       className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
                     >
-                      <span className="truncate">{edu.degree || edu.school || 'Istruzione'}</span>
+                      <span className="truncate">{edu.degree || edu.school || locale.ui.addEducation}</span>
                       <Trash2 className="w-3 h-3 text-red-500" />
                     </button>
                   ))
@@ -1251,9 +1616,9 @@ const App: React.FC = () => {
               </div>
 
               <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">Competenze</p>
+                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.skillsLabel}</p>
                 {data.skills.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">Nessuna competenza</p>
+                  <p className="text-[10px] text-slate-400">{locale.ui.emptySkills}</p>
                 ) : (
                   data.skills.map((skill, idx) => (
                     <button
@@ -1261,7 +1626,7 @@ const App: React.FC = () => {
                       onClick={() => removeListItem('skills', idx)}
                       className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
                     >
-                      <span className="truncate">{skill.trim() || 'Competenza vuota'}</span>
+                      <span className="truncate">{skill.trim() || locale.ui.emptySkillFallback}</span>
                       <Trash2 className="w-3 h-3 text-red-500" />
                     </button>
                   ))
@@ -1269,9 +1634,9 @@ const App: React.FC = () => {
               </div>
 
               <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">Lingue</p>
+                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.languagesLabel}</p>
                 {data.languages.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">Nessuna lingua</p>
+                  <p className="text-[10px] text-slate-400">{locale.ui.emptyLanguages}</p>
                 ) : (
                   data.languages.map((lang, idx) => (
                     <button
@@ -1279,7 +1644,7 @@ const App: React.FC = () => {
                       onClick={() => removeListItem('languages', idx)}
                       className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
                     >
-                      <span className="truncate">{lang.trim() || 'Lingua vuota'}</span>
+                      <span className="truncate">{lang.trim() || locale.ui.emptyLanguageFallback}</span>
                       <Trash2 className="w-3 h-3 text-red-500" />
                     </button>
                   ))
@@ -1287,9 +1652,9 @@ const App: React.FC = () => {
               </div>
 
               <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">Soft Skills</p>
+                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.softSkillsLabel}</p>
                 {data.softSkills.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">Nessuna soft skill</p>
+                  <p className="text-[10px] text-slate-400">{locale.ui.emptySoftSkills}</p>
                 ) : (
                   data.softSkills.map((skill, idx) => (
                     <button
@@ -1297,7 +1662,7 @@ const App: React.FC = () => {
                       onClick={() => removeListItem('softSkills', idx)}
                       className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
                     >
-                      <span className="truncate">{skill.trim() || 'Soft skill vuota'}</span>
+                      <span className="truncate">{skill.trim() || locale.ui.emptySoftSkillFallback}</span>
                       <Trash2 className="w-3 h-3 text-red-500" />
                     </button>
                   ))
@@ -1388,25 +1753,6 @@ const App: React.FC = () => {
               </div>
               <Maximize2 className="w-5 h-5 text-slate-500 group-hover:text-blue-400" />
             </button>
-          </section>
-
-          {/* Traduzione Titoli Sezioni */}
-          <section className="space-y-4">
-            <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest flex items-center gap-2">
-              <Settings2 className="w-3 h-3" /> Titoli delle Sezioni
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-               {Object.entries(data.sectionTitles).map(([key, value]) => (
-                  <div key={key} className="flex flex-col gap-1">
-                     <label className="text-[9px] uppercase font-black text-slate-600">{key}</label>
-                     <input 
-                        className="bg-slate-800 border-none rounded-lg p-2 text-xs text-white focus:ring-1 focus:ring-blue-500" 
-                        value={value} 
-                        onChange={e => handleTitleUpdate(key as keyof SectionTitles, e.target.value)} 
-                     />
-                  </div>
-               ))}
-            </div>
           </section>
 
           <section className="space-y-4">
@@ -1536,9 +1882,36 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      <main className="flex-1 bg-gray-100 p-4 md:p-12 overflow-y-auto print-padding flex flex-col items-center gap-6">
+      <main className="flex-1 bg-gray-100 p-4 md:p-12 overflow-y-auto print-padding flex flex-col items-center gap-6 relative">
+        <div className="absolute top-4 right-4 z-30 no-print flex flex-col items-end gap-2">
+          <div className="flex items-center gap-1 bg-white/90 border border-slate-200 rounded-full p-1 shadow-md">
+            {(Object.keys(LOCALES) as Language[]).map(lang => (
+              <button
+                key={lang}
+                onClick={() => setLanguage(lang)}
+                className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full transition ${
+                  language === lang ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {lang.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleSaveToBrowser}
+            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-full shadow-md border transition ${
+              saveStatus === 'saved'
+                ? 'bg-emerald-500 text-white border-emerald-400'
+                : saveStatus === 'error'
+                  ? 'bg-red-500 text-white border-red-400'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {saveStatus === 'saved' ? locale.ui.saved : locale.ui.save}
+          </button>
+        </div>
         <div className="bg-blue-600 text-white px-6 py-2 rounded-full text-xs font-bold flex items-center gap-2 shadow-lg animate-bounce no-print">
-          <Edit3 className="w-4 h-4" /> CLICCA DIRETTAMENTE SULLA CARTA PER MODIFICARE
+          <Edit3 className="w-4 h-4" /> {locale.ui.clickToEdit}
         </div>
         <div className="relative w-full flex justify-center">
           <div 

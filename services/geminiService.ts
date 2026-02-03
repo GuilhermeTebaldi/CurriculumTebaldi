@@ -1,19 +1,27 @@
 
-import { GoogleGenAI } from "@google/genai";
+type ApiResponse = { text?: string; error?: string };
 
-// Always use the recommended initialization with named apiKey parameter
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const postJson = async (path: string, payload: Record<string, unknown>): Promise<ApiResponse> => {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = (await response.json().catch(() => ({}))) as ApiResponse;
+
+  if (!response.ok) {
+    const message = data.error || `Request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return data;
+};
 
 export const optimizeText = async (text: string, context: string): Promise<string> => {
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Agisci come un esperto HR italiano. Ottimizza il seguente testo per un Curriculum Vitae professionale in Italia. 
-      Contesto: ${context}. 
-      Testo originale: "${text}". 
-      Rispondi solo con il testo ottimizzato in italiano formale.`,
-    });
-    return response.text || text;
+    const data = await postJson('/api/optimize', { text, context });
+    return data.text || text;
   } catch (error) {
     console.error("Gemini API Error:", error);
     return text;
@@ -22,11 +30,8 @@ export const optimizeText = async (text: string, context: string): Promise<strin
 
 export const translateToItalian = async (text: string): Promise<string> => {
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Traduci professionalmente in italiano per un CV: "${text}". Rispondi solo con la traduzione.`,
-    });
-    return response.text || text;
+    const data = await postJson('/api/translate', { text });
+    return data.text || text;
   } catch (error) {
     console.error("Gemini API Error:", error);
     return text;

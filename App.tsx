@@ -368,6 +368,7 @@ const INITIAL_DATA: CVData = {
   location: "Italia / Remoto",
   nationality: "Brasiliano",
   birthDate: "1996",
+  profileImagePos: 50,
   github: "github.com/GuilhermeTebaldi",
   linkedin: "linkedin.com/in/guilherme-tebaldi",
   portfolio: "guilhermetebaldi.dev",
@@ -434,6 +435,81 @@ const Editable: React.FC<{
     </Tag>
   );
 };
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const ProfilePhoto: React.FC<{
+  src?: string;
+  position?: number;
+  onPositionChange?: (val: number) => void;
+  grayscale?: boolean;
+  className?: string;
+  fallback?: React.ReactNode;
+}> = ({ src, position = 50, onPositionChange, grayscale, className, fallback }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startY: number; startPos: number } | null>(null);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!src || !onPositionChange) return;
+    dragRef.current = { startY: e.clientY, startPos: position };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current || !containerRef.current || !onPositionChange) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const delta = ((e.clientY - dragRef.current.startY) / (rect.height || 1)) * 100;
+    const nextPos = clamp(dragRef.current.startPos + delta, 0, 100);
+    onPositionChange(nextPos);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className={`w-full h-full ${src ? 'cursor-ns-resize' : ''} ${className ?? ''}`}
+      style={
+        src
+          ? {
+              backgroundImage: `url(${src})`,
+              backgroundSize: 'cover',
+              backgroundPosition: `50% ${position}%`,
+              backgroundRepeat: 'no-repeat',
+              filter: grayscale ? 'grayscale(100%)' : undefined,
+              touchAction: 'none'
+            }
+          : undefined
+      }
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+    >
+      {!src && fallback}
+    </div>
+  );
+};
+
+const PhotoUploadButton: React.FC<{
+  onClick: () => void;
+  className?: string;
+  iconSize?: number;
+}> = ({ onClick, className, iconSize = 16 }) => (
+  <button
+    onClick={onClick}
+    data-html2canvas-ignore="true"
+    className={`absolute bottom-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center opacity-100 md:opacity-0 md:group-hover/img:opacity-100 transition ${className ?? ''}`}
+    title="Carica foto"
+    type="button"
+  >
+    <Camera size={iconSize} />
+  </button>
+);
 
 const TemplateDrawing: React.FC<{ type: CVTemplate }> = ({ type }) => {
   switch (type) {
@@ -599,7 +675,13 @@ const App: React.FC = () => {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      if (parsed?.data) setData(parsed.data as CVData);
+      if (parsed?.data) {
+        const nextData = parsed.data as CVData;
+        setData({
+          ...nextData,
+          profileImagePos: typeof nextData.profileImagePos === 'number' ? nextData.profileImagePos : 50
+        });
+      }
       if (Array.isArray(parsed?.modifiedFields)) {
         setModifiedFields(new Set<string>(parsed.modifiedFields));
       }
@@ -642,14 +724,34 @@ const App: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        handleUpdate('profileImage', reader.result as string);
+        setData(prev => ({
+          ...prev,
+          profileImage: reader.result as string,
+          profileImagePos: 50
+        }));
+        setModifiedFields(prev => {
+          const next = new Set(prev);
+          next.add('profileImage');
+          next.add('profileImagePos');
+          return next;
+        });
       };
       reader.readAsDataURL(file);
     }
   };
 
   const removeImage = () => {
-    handleUpdate('profileImage', undefined);
+    setData(prev => ({
+      ...prev,
+      profileImage: undefined,
+      profileImagePos: prev.profileImagePos ?? 50
+    }));
+    setModifiedFields(prev => {
+      const next = new Set(prev);
+      next.add('profileImage');
+      next.add('profileImagePos');
+      return next;
+    });
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -864,10 +966,13 @@ const App: React.FC = () => {
               </div>
 
               <div className="w-24 h-24 bg-white/20 rounded-md overflow-hidden border border-white/30 relative group/img">
-                {data.profileImage ? <img src={data.profileImage} className="w-full h-full object-cover" /> : <User className="w-full h-full p-4 opacity-50" />}
-                <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity">
-                  <Camera size={20} />
-                </button>
+                <ProfilePhoto
+                  src={data.profileImage}
+                  position={data.profileImagePos}
+                  onPositionChange={val => handleUpdate('profileImagePos', val)}
+                  fallback={<User className="w-full h-full p-4 opacity-50" />}
+                />
+                <PhotoUploadButton onClick={() => fileInputRef.current?.click()} iconSize={14} className="w-6 h-6" />
               </div>
             </header>
 
@@ -1079,8 +1184,13 @@ const App: React.FC = () => {
           <div className="flex p-10 bg-white min-h-full font-sans text-slate-800 relative">
             <div className="w-1/3 pr-10 border-r border-slate-100 flex flex-col">
               <div className="w-32 h-32 bg-slate-100 rounded-full mb-8 overflow-hidden self-center group/img relative">
-                {data.profileImage && <img src={data.profileImage} className="w-full h-full object-cover grayscale" />}
-                <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity"><Camera className="text-white w-6 h-6"/></button>
+                <ProfilePhoto
+                  src={data.profileImage}
+                  position={data.profileImagePos}
+                  onPositionChange={val => handleUpdate('profileImagePos', val)}
+                  grayscale
+                />
+                <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />
               </div>
               <div className="space-y-8 w-full">
                 <section>
@@ -1148,8 +1258,13 @@ const App: React.FC = () => {
                     <Editable tag="p" value={data.role} onChange={v => handleUpdate('role', v)} isExample={!modifiedFields.has('role')} className="mt-4 bg-yellow-400 px-3 py-1 text-xs font-black inline-block uppercase italic text-slate-900" />
                   </div>
                   <div className="w-32 h-32 bg-slate-900 rounded-3xl rotate-3 flex items-center justify-center overflow-hidden shrink-0 border-4 border-white shadow-xl relative group/img">
-                     {data.profileImage ? <img src={data.profileImage} className="w-full h-full object-cover" /> : <User className="text-white" size={48} />}
-                     <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity"><Camera className="text-white w-6 h-6"/></button>
+                     <ProfilePhoto
+                       src={data.profileImage}
+                       position={data.profileImagePos}
+                       onPositionChange={val => handleUpdate('profileImagePos', val)}
+                       fallback={<User className="text-white" size={48} />}
+                     />
+                     <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />
                   </div>
                 </div>
                 
@@ -1381,8 +1496,12 @@ const App: React.FC = () => {
           <div className="flex bg-white min-h-full font-sans relative">
              <aside className="w-1/3 bg-slate-800 text-white p-10 flex flex-col">
                 <div className="w-32 h-32 rounded-2xl bg-white/10 mb-8 overflow-hidden mx-auto border-2 border-white/20 relative group/img">
-                   {data.profileImage && <img src={data.profileImage} className="w-full h-full object-cover" />}
-                   <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity"><Camera className="text-white w-6 h-6"/></button>
+                   <ProfilePhoto
+                     src={data.profileImage}
+                     position={data.profileImagePos}
+                     onPositionChange={val => handleUpdate('profileImagePos', val)}
+                   />
+                   <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />
                 </div>
                 <div className="space-y-8 flex-1">
                    <section>
@@ -1459,8 +1578,13 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 <div className="w-36 h-36 bg-slate-100 rounded-2xl border-4 border-white shadow-xl overflow-hidden shrink-0 relative group/img">
-                  {data.profileImage ? <img src={data.profileImage} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={64} /></div>}
-                  <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity"><Camera className="text-white w-6 h-6"/></button>
+                  <ProfilePhoto
+                    src={data.profileImage}
+                    position={data.profileImagePos}
+                    onPositionChange={val => handleUpdate('profileImagePos', val)}
+                    fallback={<div className="w-full h-full flex items-center justify-center text-slate-300"><User size={64} /></div>}
+                  />
+                  <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />
                 </div>
               </div>
             </header>
@@ -1762,13 +1886,30 @@ const App: React.FC = () => {
                 onClick={() => fileInputRef.current?.click()}
                 className="w-20 h-20 bg-slate-800 rounded-xl flex items-center justify-center cursor-pointer hover:bg-slate-700 transition border-2 border-dashed border-slate-700 overflow-hidden"
               >
-                {data.profileImage ? <img src={data.profileImage} className="w-full h-full object-cover" /> : <Camera className="text-slate-500" />}
+                <ProfilePhoto
+                  src={data.profileImage}
+                  position={data.profileImagePos}
+                  fallback={<Camera className="text-slate-500" />}
+                />
               </div>
               {data.profileImage && (
                 <button onClick={removeImage} className="text-xs text-red-400 font-bold hover:underline">RIMUOVI</button>
               )}
               <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
             </div>
+            {data.profileImage && (
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Posizione Foto</label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={data.profileImagePos ?? 50}
+                  onChange={e => handleUpdate('profileImagePos', Number(e.target.value))}
+                  className="w-full accent-blue-500"
+                />
+              </div>
+            )}
           </section>
 
           <section className="space-y-3">

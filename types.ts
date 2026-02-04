@@ -38,6 +38,7 @@ export interface CVData {
   birthDate: string;
   summary: string;
   profileImage?: string;
+  profileImagePos?: number;
   github: string;
   linkedin: string;
   portfolio: string;

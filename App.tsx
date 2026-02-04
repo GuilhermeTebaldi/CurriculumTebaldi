@@ -1358,6 +1358,18 @@ const App: React.FC = () => {
                     ))}
                   </div>
                 </section>
+                <section>
+                  <Editable
+                    tag="h2"
+                    value={data.sectionTitles.social}
+                    onChange={v => handleTitleUpdate('social', v)}
+                    isExample={!modifiedFields.has('title_social')}
+                    className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6"
+                  />
+                  <div className="text-[10px] font-bold text-slate-600">
+                    {renderSocials()}
+                  </div>
+                </section>
               </aside>
 
               <main className="flex-1 p-12 space-y-12">
@@ -1448,6 +1460,19 @@ const App: React.FC = () => {
                         ))}
                       </div>
                     </section>
+
+                    <section>
+                      <Editable
+                        tag="h2"
+                        value={data.sectionTitles.social}
+                        onChange={v => handleTitleUpdate('social', v)}
+                        isExample={!modifiedFields.has('title_social')}
+                        className="text-xs font-black uppercase tracking-[0.4em] mb-6 text-[#8b0000] border-b border-[#d4af37]/30 pb-2"
+                      />
+                      <div className="text-[10px] uppercase font-bold tracking-widest text-[#555] space-y-2">
+                        {renderSocials()}
+                      </div>
+                    </section>
                   </div>
                 </div>
               </div>
@@ -1517,6 +1542,18 @@ const App: React.FC = () => {
                           <Editable value={s} onChange={v => updateListItem('skills', i, v)} isExample={!modifiedFields.has(`skills_${i}`)} className="text-xs font-black uppercase tracking-widest text-slate-800" />
                         </div>
                       ))}
+                    </div>
+                  </section>
+
+                  <section className="grid grid-cols-3 gap-12">
+                    <div className="col-span-1">
+                      <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} isExample={!modifiedFields.has('title_social')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
+                      <div className="h-1 w-8 bg-blue-600" />
+                    </div>
+                    <div className="col-span-2">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                        {renderSocials()}
+                      </div>
                     </div>
                   </section>
                 </div>
@@ -1600,6 +1637,13 @@ const App: React.FC = () => {
                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">
                         Phone<br /><span className="text-slate-900 text-xs"><Editable tag="span" value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} /></span>
                       </div>
+                    </div>
+                  </section>
+
+                  <section className="px-4">
+                    <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} isExample={!modifiedFields.has('title_social')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-4" />
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                      {renderSocials()}
                     </div>
                   </section>
                 </div>

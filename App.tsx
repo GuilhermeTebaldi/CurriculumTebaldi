@@ -773,8 +773,23 @@ const App: React.FC = () => {
       }
       return undefined;
     };
+    const rejectionHandler = (event: PromiseRejectionEvent) => {
+      const reason = event.reason as any;
+      const message = typeof reason?.message === 'string' ? reason.message : '';
+      if (
+        isGeneratingPDFRef.current &&
+        (reason?.name === 'NotFoundError' || reason instanceof DOMException) &&
+        /removeChild/i.test(message)
+      ) {
+        event.preventDefault();
+      }
+    };
     window.addEventListener('error', handler);
-    return () => window.removeEventListener('error', handler);
+    window.addEventListener('unhandledrejection', rejectionHandler);
+    return () => {
+      window.removeEventListener('error', handler);
+      window.removeEventListener('unhandledrejection', rejectionHandler);
+    };
   }, []);
 
   useEffect(() => {
@@ -990,7 +1005,7 @@ const App: React.FC = () => {
         restoreScheduled = true;
         window.setTimeout(() => {
           Node.prototype.removeChild = originalRemoveChild;
-        }, 2000);
+        }, 8000);
       };
 
       Node.prototype.removeChild = function (child: Node) {
@@ -1040,7 +1055,9 @@ const App: React.FC = () => {
             }
           });
         setIsGeneratingPDF(false);
-        isGeneratingPDFRef.current = false;
+        window.setTimeout(() => {
+          isGeneratingPDFRef.current = false;
+        }, 3000);
         scheduleRestore();
       };
 

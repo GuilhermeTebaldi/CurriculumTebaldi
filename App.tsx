@@ -1059,15 +1059,18 @@ const App: React.FC = () => {
         }, 3000);
       };
 
+      const baseScale = Math.max(window.devicePixelRatio || 1, 2);
+      const renderScale = Math.min(baseScale * 2, 4);
+
       html2canvas(clone, {
-        scale: 2,
+        scale: renderScale,
         useCORS: true,
         scrollX: 0,
         scrollY: 0,
         removeContainer: false
       })
         .then((canvas: HTMLCanvasElement) => {
-          const imgData = canvas.toDataURL('image/jpeg', 0.98);
+          const imgData = canvas.toDataURL('image/png');
           const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
           const pdfWidth = 210;
           const pdfHeight = 297;

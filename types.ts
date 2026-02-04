@@ -14,7 +14,7 @@ export interface Education {
   year: string;
 }
 
-export type CVTemplate = 'modern' | 'classic' | 'minimal' | 'creative' | 'corporate' | 'elegant' | 'tech' | 'sidebar' | 'europass';
+export type CVTemplate = 'modern' | 'classic' | 'minimal' | 'creative' | 'corporate' | 'elegant' | 'tech' | 'sidebar' | 'europass' | 'executivepro' | 'neoclassic' | 'architectural' | 'softui';
 
 export interface SectionTitles {
   experience: string;

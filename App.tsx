@@ -1107,21 +1107,20 @@ const App: React.FC = () => {
 
     if (socials.length === 0) return null;
 
+    const containerClassName = `flex flex-wrap gap-x-6 gap-y-2 max-w-full ${isDark ? 'text-blue-400' : 'text-slate-500'} ${options?.containerClassName ?? ''}`;
+    const itemClassName = `flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase max-w-full min-w-0 ${options?.itemClassName ?? ''}`;
+    const editableClassName = `break-all min-w-0 ${options?.editableClassName ?? ''}`;
+
     return (
-      <div
-        className={`flex flex-wrap gap-x-6 gap-y-2 ${isDark ? 'text-blue-400' : 'text-slate-500'} ${options?.containerClassName ?? ''}`}
-      >
+      <div className={containerClassName}>
         {socials.map(s => (
-          <div
-            key={s.id}
-            className={`flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase ${options?.itemClassName ?? ''}`}
-          >
+          <div key={s.id} className={itemClassName}>
             {s.icon}{' '}
             <Editable
               value={s.value}
               onChange={v => handleUpdate(s.id as any, v)}
               isExample={!modifiedFields.has(s.id)}
-              className={options?.editableClassName}
+              className={editableClassName}
             />
           </div>
         ))}
@@ -1649,15 +1648,15 @@ const App: React.FC = () => {
                   <section className="px-4 space-y-6">
                     <div className="flex items-center gap-4 p-3 bg-slate-50/50 rounded-2xl border border-white">
                       <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-blue-500"><Mail size={18} /></div>
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight max-w-full">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight max-w-full min-w-0">
                         Email<br />
-                        <span className="text-slate-900 text-xs lowercase break-all">
+                        <span className="text-slate-900 text-xs lowercase break-all max-w-full min-w-0">
                           <Editable
                             tag="span"
                             value={data.email}
                             onChange={v => handleUpdate('email', v)}
                             isExample={!modifiedFields.has('email')}
-                            className="break-all"
+                            className="break-all min-w-0"
                           />
                         </span>
                       </div>

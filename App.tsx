@@ -786,9 +786,26 @@ const App: React.FC = () => {
     };
     window.addEventListener('error', handler);
     window.addEventListener('unhandledrejection', rejectionHandler);
+
+    const originalRemoveChild = Node.prototype.removeChild;
+    Node.prototype.removeChild = function (child: Node) {
+      try {
+        return originalRemoveChild.call(this, child);
+      } catch (err: any) {
+        if (
+          isGeneratingPDFRef.current &&
+          (err?.name === 'NotFoundError' || err instanceof DOMException)
+        ) {
+          return child;
+        }
+        throw err;
+      }
+    };
+
     return () => {
       window.removeEventListener('error', handler);
       window.removeEventListener('unhandledrejection', rejectionHandler);
+      Node.prototype.removeChild = originalRemoveChild;
     };
   }, []);
 
@@ -998,24 +1015,6 @@ const App: React.FC = () => {
         return;
       }
 
-      const originalRemoveChild = Node.prototype.removeChild;
-      let restoreScheduled = false;
-      const scheduleRestore = () => {
-        if (restoreScheduled) return;
-        restoreScheduled = true;
-        window.setTimeout(() => {
-          Node.prototype.removeChild = originalRemoveChild;
-        }, 8000);
-      };
-
-      Node.prototype.removeChild = function (child: Node) {
-        try {
-          return originalRemoveChild.call(this, child);
-        } catch (err) {
-          return child;
-        }
-      };
-
       const existingHtml2CanvasContainers = new Set(
         Array.from(document.querySelectorAll('.html2canvas-container'))
       );
@@ -1058,7 +1057,6 @@ const App: React.FC = () => {
         window.setTimeout(() => {
           isGeneratingPDFRef.current = false;
         }, 3000);
-        scheduleRestore();
       };
 
       html2canvas(clone, {
@@ -2387,7 +2385,13 @@ const App: React.FC = () => {
               {data.profileImage && (
                 <button onClick={removeImage} className="text-xs text-red-400 font-bold hover:underline">RIMUOVI</button>
               )}
-              <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+                className="absolute -left-[9999px] w-px h-px opacity-0"
+                accept="image/*"
+              />
             </div>
             {data.profileImage && (
               <div className="space-y-2">

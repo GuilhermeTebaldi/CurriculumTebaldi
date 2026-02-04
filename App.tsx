@@ -726,6 +726,7 @@ const App: React.FC = () => {
   const [mobileToolsTab, setMobileToolsTab] = useState<'add' | 'remove'>('add');
   const [language, setLanguage] = useState<Language>('it');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const isGeneratingPDFRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
 
@@ -752,6 +753,28 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Load Error:", err);
     }
+  }, []);
+
+  useEffect(() => {
+    isGeneratingPDFRef.current = isGeneratingPDF;
+  }, [isGeneratingPDF]);
+
+  useEffect(() => {
+    const handler = (event: ErrorEvent) => {
+      const error = event.error as any;
+      if (
+        isGeneratingPDFRef.current &&
+        error &&
+        (error.name === 'NotFoundError' || error instanceof DOMException) &&
+        /removeChild/i.test(event.message)
+      ) {
+        event.preventDefault();
+        return true;
+      }
+      return undefined;
+    };
+    window.addEventListener('error', handler);
+    return () => window.removeEventListener('error', handler);
   }, []);
 
   useEffect(() => {
@@ -951,10 +974,12 @@ const App: React.FC = () => {
   const handleDownloadPDF = () => {
     if (!cvRef.current) return;
     setIsGeneratingPDF(true);
+    isGeneratingPDFRef.current = true;
     requestAnimationFrame(() => {
       const element = cvRef.current;
       if (!element) {
         setIsGeneratingPDF(false);
+        isGeneratingPDFRef.current = false;
         return;
       }
 
@@ -975,6 +1000,10 @@ const App: React.FC = () => {
           return child;
         }
       };
+
+      const existingHtml2CanvasContainers = new Set(
+        Array.from(document.querySelectorAll('.html2canvas-container'))
+      );
 
       const wrapper = document.createElement('div');
       wrapper.style.position = 'fixed';
@@ -999,7 +1028,19 @@ const App: React.FC = () => {
 
       const cleanup = () => {
         if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+        document
+          .querySelectorAll('.html2canvas-container')
+          .forEach(container => {
+            if (!existingHtml2CanvasContainers.has(container) && container.parentNode) {
+              try {
+                container.parentNode.removeChild(container);
+              } catch (err) {
+                // ignore cleanup errors
+              }
+            }
+          });
         setIsGeneratingPDF(false);
+        isGeneratingPDFRef.current = false;
         scheduleRestore();
       };
 
@@ -1007,7 +1048,8 @@ const App: React.FC = () => {
         scale: 2,
         useCORS: true,
         scrollX: 0,
-        scrollY: 0
+        scrollY: 0,
+        removeContainer: false
       })
         .then((canvas: HTMLCanvasElement) => {
           const imgData = canvas.toDataURL('image/jpeg', 0.98);

@@ -11,6 +11,8 @@ import {
   Code, 
   Briefcase, 
   GraduationCap,
+  Ruler,
+  Sparkle,
   Globe,
   User,
   CheckCircle2,
@@ -515,6 +517,63 @@ const PhotoUploadButton: React.FC<{
 
 const TemplateDrawing: React.FC<{ type: CVTemplate }> = ({ type }) => {
   switch (type) {
+    case 'executivepro':
+      return (
+        <div className="w-full h-full bg-white p-1 flex flex-col border border-slate-200">
+          <div className="h-5 bg-slate-900 w-full" />
+          <div className="flex flex-1">
+            <div className="w-1/3 bg-slate-50 border-r border-slate-200 p-1 space-y-1">
+              <div className="h-0.5 bg-slate-200 w-full" />
+              <div className="h-0.5 bg-slate-200 w-3/4" />
+            </div>
+            <div className="flex-1 p-1 space-y-1">
+              <div className="h-1 bg-blue-500 w-1/2" />
+              <div className="h-0.5 bg-slate-100 w-full" />
+              <div className="h-0.5 bg-slate-100 w-full" />
+            </div>
+          </div>
+        </div>
+      );
+    case 'neoclassic':
+      return (
+        <div className="w-full h-full bg-[#fffcf8] p-1 border border-[#d4af37]/40">
+          <div className="h-full border border-[#d4af37]/60 p-1 flex flex-col">
+            <div className="h-2 bg-[#8b0000]/80 w-2/3 self-center" />
+            <div className="h-0.5 bg-[#d4af37]/60 w-full my-1" />
+            <div className="flex-1 grid grid-cols-3 gap-1">
+              <div className="col-span-2 space-y-1">
+                <div className="h-0.5 bg-[#8b0000]/60 w-1/2" />
+                <div className="h-0.5 bg-slate-200 w-full" />
+              </div>
+              <div className="space-y-1">
+                <div className="h-0.5 bg-[#8b0000]/60 w-full" />
+                <div className="h-0.5 bg-slate-200 w-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    case 'architectural':
+      return (
+        <div className="w-full h-full bg-white p-1 flex border border-slate-200">
+          <div className="w-2 bg-slate-800" />
+          <div className="flex-1 p-1 space-y-1">
+            <div className="h-1 bg-slate-800 w-2/3" />
+            <div className="h-0.5 bg-blue-500 w-1/3" />
+            <div className="h-0.5 bg-slate-100 w-full" />
+          </div>
+        </div>
+      );
+    case 'softui':
+      return (
+        <div className="w-full h-full bg-slate-50 p-1 border border-slate-200">
+          <div className="h-full bg-white rounded-md p-1 space-y-1 shadow-sm">
+            <div className="h-1 bg-blue-500/50 w-1/3" />
+            <div className="h-0.5 bg-slate-200 w-full" />
+            <div className="h-2 bg-slate-100 rounded" />
+          </div>
+        </div>
+      );
     case 'europass':
       return (
         <div className="w-full h-full bg-white p-1 flex flex-col gap-0 border border-slate-200">
@@ -947,7 +1006,6 @@ const App: React.FC = () => {
       html2canvas(clone, {
         scale: 2,
         useCORS: true,
-        letterRendering: true,
         scrollX: 0,
         scrollY: 0
       })
@@ -1177,6 +1235,316 @@ const App: React.FC = () => {
             <footer className="bg-slate-50 p-6 flex justify-center border-t border-slate-200">
               <div className="flex items-center gap-10">{renderSocials()}</div>
             </footer>
+          </div>
+        );
+      case 'executivepro':
+        return (
+          <div className="min-h-full bg-white flex flex-col font-sans text-slate-800 relative">
+            <header className="bg-slate-900 text-white p-12 flex justify-between items-center">
+              <div>
+                <Editable tag="h1" value={data.fullName} onChange={v => handleUpdate('fullName', v)} isExample={!modifiedFields.has('fullName')} className="text-4xl font-black uppercase tracking-widest mb-2" />
+                <Editable tag="p" value={data.role} onChange={v => handleUpdate('role', v)} isExample={!modifiedFields.has('role')} className="text-xl text-blue-400 font-bold italic" />
+              </div>
+              <div className="w-32 h-32 bg-white/10 rounded-full overflow-hidden border-4 border-white/20 relative group/img">
+                <ProfilePhoto
+                  src={data.profileImage}
+                  position={data.profileImagePos}
+                  onPositionChange={val => handleUpdate('profileImagePos', val)}
+                  fallback={<div className="w-full h-full flex items-center justify-center opacity-30"><Briefcase size={40} /></div>}
+                />
+                {!isGeneratingPDF && <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />}
+              </div>
+            </header>
+
+            <div className="flex-1 flex">
+              <aside className="w-1/3 bg-slate-50 p-10 border-r border-slate-200 space-y-12">
+                <section>
+                  <Editable tag="h2" value={data.sectionTitles.contact} onChange={v => handleTitleUpdate('contact', v)} isExample={!modifiedFields.has('title_contact')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6" />
+                  <div className="space-y-4 text-xs font-bold text-slate-600">
+                    <div className="flex items-center gap-3">
+                      <Mail size={14} className="text-blue-500" />
+                      <Editable value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Phone size={14} className="text-blue-500" />
+                      <Editable value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <MapPin size={14} className="text-blue-500" />
+                      <Editable value={data.location} onChange={v => handleUpdate('location', v)} isExample={!modifiedFields.has('location')} />
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} isExample={!modifiedFields.has('title_skills')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6" />
+                  <div className="flex flex-wrap gap-2">
+                    {data.skills.map((s, i) => (
+                      <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} isExample={!modifiedFields.has(`skills_${i}`)} className="bg-white border border-slate-200 px-3 py-1.5 rounded-md text-[10px] font-black text-slate-700 shadow-sm" />
+                    ))}
+                  </div>
+                </section>
+
+                <section>
+                  <Editable tag="h2" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} isExample={!modifiedFields.has('title_languages')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6" />
+                  <div className="space-y-3">
+                    {data.languages.map((l, i) => (
+                      <div key={i} className="text-xs font-bold text-slate-700 flex justify-between items-center">
+                        <Editable value={l} onChange={v => updateListItem('languages', i, v)} isExample={!modifiedFields.has(`languages_${i}`)} />
+                        <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 w-full" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </aside>
+
+              <main className="flex-1 p-12 space-y-12">
+                <section>
+                  <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} isExample={!modifiedFields.has('title_summary')} className="text-lg font-black uppercase text-slate-900 mb-4" />
+                  <div className="w-10 h-1 bg-blue-500 mb-6" />
+                  <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-sm leading-relaxed text-slate-600 italic" />
+                </section>
+
+                <section>
+                  <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} isExample={!modifiedFields.has('title_experience')} className="text-lg font-black uppercase text-slate-900 mb-8" />
+                  <div className="space-y-10">
+                    {data.experiences.map(exp => (
+                      <div key={exp.id}>
+                        <div className="flex justify-between items-baseline mb-2">
+                          <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} isExample={!modifiedFields.has(`exp_${exp.id}_role`)} className="text-base font-black text-slate-900" />
+                          <Editable tag="span" value={exp.period} onChange={v => updateExperience(exp.id, 'period', v)} isExample={!modifiedFields.has(`exp_${exp.id}_period`)} className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-1 rounded" />
+                        </div>
+                        <Editable tag="p" value={exp.company} onChange={v => updateExperience(exp.id, 'company', v)} isExample={!modifiedFields.has(`exp_${exp.id}_company`)} className="text-sm font-bold text-slate-400 mb-3" />
+                        <Editable value={exp.description} onChange={v => updateExperience(exp.id, 'description', v)} isExample={!modifiedFields.has(`exp_${exp.id}_description`)} className="text-xs leading-relaxed text-slate-500" />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </main>
+            </div>
+          </div>
+        );
+      case 'neoclassic':
+        return (
+          <div className="min-h-full h-full bg-[#fffcf8] p-12 font-serif text-[#1a1a1a] shadow-inner">
+            <div className="border border-[#d4af37]/30 p-1 w-full h-full">
+              <div className="border border-[#d4af37]/60 p-10 h-full flex flex-col">
+                <header className="text-center mb-10">
+                  <Editable tag="h1" value={data.fullName} onChange={v => handleUpdate('fullName', v)} isExample={!modifiedFields.has('fullName')} className="text-5xl font-normal uppercase tracking-[0.2em] mb-4 text-[#8b0000]" />
+                  <Editable tag="p" value={data.role} onChange={v => handleUpdate('role', v)} isExample={!modifiedFields.has('role')} className="text-sm font-bold uppercase tracking-widest text-[#d4af37] mb-6" />
+                  <div className="flex justify-center gap-8 text-[10px] uppercase font-bold tracking-widest text-slate-400">
+                    <span className="flex items-center gap-2"><Mail size={10} /> <Editable tag="span" value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} /></span>
+                    <span className="flex items-center gap-2"><Phone size={10} /> <Editable tag="span" value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} /></span>
+                    <span className="flex items-center gap-2"><MapPin size={10} /> <Editable tag="span" value={data.location} onChange={v => handleUpdate('location', v)} isExample={!modifiedFields.has('location')} /></span>
+                  </div>
+                </header>
+
+                <div className="grid grid-cols-12 gap-10 flex-1">
+                  <div className="col-span-8 space-y-12">
+                    <section>
+                      <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} isExample={!modifiedFields.has('title_summary')} className="text-xs font-black uppercase tracking-[0.4em] mb-8 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
+                      <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-base leading-relaxed text-[#333] text-justify italic" />
+                    </section>
+
+                    <section>
+                      <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} isExample={!modifiedFields.has('title_experience')} className="text-xs font-black uppercase tracking-[0.4em] mb-8 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
+                      <div className="space-y-8">
+                        {data.experiences.map(exp => (
+                          <div key={exp.id} className="relative">
+                            <div className="flex justify-between items-baseline mb-3">
+                              <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} isExample={!modifiedFields.has(`exp_${exp.id}_role`)} className="text-xl font-normal italic" />
+                              <Editable tag="span" value={exp.period} onChange={v => updateExperience(exp.id, 'period', v)} isExample={!modifiedFields.has(`exp_${exp.id}_period`)} className="text-[10px] font-bold text-[#d4af37] uppercase" />
+                            </div>
+                            <Editable tag="p" value={exp.company} onChange={v => updateExperience(exp.id, 'company', v)} isExample={!modifiedFields.has(`exp_${exp.id}_company`)} className="text-xs font-black uppercase mb-4 text-slate-400" />
+                            <Editable value={exp.description} onChange={v => updateExperience(exp.id, 'description', v)} isExample={!modifiedFields.has(`exp_${exp.id}_description`)} className="text-sm leading-relaxed text-[#444] text-justify" />
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+
+                  <div className="col-span-4 space-y-12">
+                    <section>
+                      <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} isExample={!modifiedFields.has('title_skills')} className="text-xs font-black uppercase tracking-[0.4em] mb-6 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
+                      <div className="space-y-3">
+                        {data.skills.map((s, i) => (
+                          <div key={i} className="text-xs font-bold uppercase tracking-widest text-[#555] flex items-center gap-3">
+                            <div className="w-1 h-1 bg-[#d4af37]" />
+                            <Editable value={s} onChange={v => updateListItem('skills', i, v)} isExample={!modifiedFields.has(`skills_${i}`)} />
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section>
+                      <Editable tag="h2" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} isExample={!modifiedFields.has('title_languages')} className="text-xs font-black uppercase tracking-[0.4em] mb-6 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
+                      <div className="space-y-4">
+                        {data.languages.map((l, i) => (
+                          <div key={i} className="text-xs font-normal text-[#555] italic">
+                            <Editable value={l} onChange={v => updateListItem('languages', i, v)} isExample={!modifiedFields.has(`languages_${i}`)} />
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      case 'architectural':
+        return (
+          <div className="min-h-full bg-[#f0f2f5] p-0 font-sans text-[#2d3436]">
+            <div className="flex min-h-full">
+              <aside className="w-24 bg-[#2d3436] flex flex-col items-center py-12 gap-12 text-white/30">
+                <Ruler size={24} />
+                <div className="h-full w-[1px] bg-white/10" />
+              </aside>
+
+              <div className="flex-1 p-16 bg-white shadow-2xl">
+                <header className="mb-20 grid grid-cols-2 border-b-4 border-[#2d3436] pb-12">
+                  <div>
+                    <Editable tag="h1" value={data.fullName} onChange={v => handleUpdate('fullName', v)} isExample={!modifiedFields.has('fullName')} className="text-6xl font-black uppercase tracking-tighter leading-none mb-4" />
+                    <Editable tag="p" value={data.role} onChange={v => handleUpdate('role', v)} isExample={!modifiedFields.has('role')} className="text-sm font-black uppercase tracking-[0.4em] text-blue-600" />
+                  </div>
+                  <div className="text-right flex flex-col justify-end text-[10px] font-black uppercase tracking-widest text-slate-400 gap-1">
+                    <Editable tag="span" value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} />
+                    <Editable tag="span" value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} />
+                    <Editable tag="span" value={data.location} onChange={v => handleUpdate('location', v)} isExample={!modifiedFields.has('location')} />
+                  </div>
+                </header>
+
+                <div className="space-y-24">
+                  <section className="grid grid-cols-3 gap-12">
+                    <div className="col-span-1">
+                      <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} isExample={!modifiedFields.has('title_summary')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
+                      <div className="h-1 w-8 bg-blue-600" />
+                    </div>
+                    <div className="col-span-2">
+                      <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-lg font-medium text-slate-600 leading-relaxed" />
+                    </div>
+                  </section>
+
+                  <section className="grid grid-cols-3 gap-12">
+                    <div className="col-span-1">
+                      <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} isExample={!modifiedFields.has('title_experience')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
+                      <div className="h-1 w-8 bg-blue-600" />
+                    </div>
+                    <div className="col-span-2 space-y-12">
+                      {data.experiences.map(exp => (
+                        <div key={exp.id} className="group">
+                          <div className="flex justify-between items-baseline mb-4">
+                            <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} isExample={!modifiedFields.has(`exp_${exp.id}_role`)} className="text-2xl font-black uppercase tracking-tight" />
+                            <Editable tag="span" value={exp.period} onChange={v => updateExperience(exp.id, 'period', v)} isExample={!modifiedFields.has(`exp_${exp.id}_period`)} className="text-[10px] font-black bg-slate-100 px-3 py-1 text-slate-400" />
+                          </div>
+                          <Editable tag="p" value={exp.company} onChange={v => updateExperience(exp.id, 'company', v)} isExample={!modifiedFields.has(`exp_${exp.id}_company`)} className="text-sm font-bold text-blue-600 mb-4 uppercase tracking-widest" />
+                          <Editable value={exp.description} onChange={v => updateExperience(exp.id, 'description', v)} isExample={!modifiedFields.has(`exp_${exp.id}_description`)} className="text-sm text-slate-500 leading-relaxed border-l-2 border-slate-100 pl-6" />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="grid grid-cols-3 gap-12">
+                    <div className="col-span-1">
+                      <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} isExample={!modifiedFields.has('title_skills')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
+                      <div className="h-1 w-8 bg-blue-600" />
+                    </div>
+                    <div className="col-span-2 grid grid-cols-2 gap-x-12 gap-y-6">
+                      {data.skills.map((s, i) => (
+                        <div key={i} className="border-b border-slate-100 pb-2">
+                          <Editable value={s} onChange={v => updateListItem('skills', i, v)} isExample={!modifiedFields.has(`skills_${i}`)} className="text-xs font-black uppercase tracking-widest text-slate-800" />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      case 'softui':
+        return (
+          <div className="min-h-full bg-slate-50 p-10 font-sans text-slate-700">
+            <div className="bg-white rounded-[40px] shadow-2xl p-12 min-h-full border border-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2" />
+              
+              <header className="flex items-center gap-10 mb-14 relative">
+                <div className="w-28 h-28 bg-slate-100 rounded-[32px] shadow-inner overflow-hidden relative group/img">
+                  <ProfilePhoto
+                    src={data.profileImage}
+                    position={data.profileImagePos}
+                    onPositionChange={val => handleUpdate('profileImagePos', val)}
+                    fallback={<div className="w-full h-full flex items-center justify-center text-slate-300"><User size={48} /></div>}
+                  />
+                  {!isGeneratingPDF && <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />}
+                </div>
+                <div>
+                  <Editable tag="h1" value={data.fullName} onChange={v => handleUpdate('fullName', v)} isExample={!modifiedFields.has('fullName')} className="text-4xl font-black text-slate-900 tracking-tight mb-2" />
+                  <div className="flex items-center gap-4">
+                    <Editable tag="p" value={data.role} onChange={v => handleUpdate('role', v)} isExample={!modifiedFields.has('role')} className="text-lg font-bold text-blue-600/80" />
+                    <div className="w-1.5 h-1.5 bg-slate-200 rounded-full" />
+                    <Editable tag="p" value={data.location} onChange={v => handleUpdate('location', v)} isExample={!modifiedFields.has('location')} className="text-sm font-bold text-slate-400 uppercase tracking-widest" />
+                  </div>
+                </div>
+              </header>
+
+              <div className="grid grid-cols-12 gap-12 relative">
+                <div className="col-span-7 space-y-12">
+                  <section className="bg-slate-50/50 p-8 rounded-[32px] border border-white">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-6 flex items-center gap-2">
+                      <Sparkle size={12} className="text-blue-500" /> 
+                      <Editable tag="span" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} isExample={!modifiedFields.has('title_summary')} />
+                    </h2>
+                    <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-sm leading-relaxed text-slate-500" />
+                  </section>
+
+                  <section className="px-4">
+                    <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} isExample={!modifiedFields.has('title_experience')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-8" />
+                    <div className="space-y-8">
+                      {data.experiences.map(exp => (
+                        <div key={exp.id} className="relative pl-10 border-l-4 border-slate-50">
+                          <div className="absolute left-[-10px] top-1.5 w-4 h-4 rounded-full bg-white shadow-md border-4 border-blue-500" />
+                          <div className="flex justify-between items-start mb-2">
+                            <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} isExample={!modifiedFields.has(`exp_${exp.id}_role`)} className="text-lg font-black text-slate-800" />
+                            <Editable tag="span" value={exp.period} onChange={v => updateExperience(exp.id, 'period', v)} isExample={!modifiedFields.has(`exp_${exp.id}_period`)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest" />
+                          </div>
+                          <Editable tag="p" value={exp.company} onChange={v => updateExperience(exp.id, 'company', v)} isExample={!modifiedFields.has(`exp_${exp.id}_company`)} className="text-xs font-black text-blue-500 uppercase tracking-widest mb-4" />
+                          <Editable value={exp.description} onChange={v => updateExperience(exp.id, 'description', v)} isExample={!modifiedFields.has(`exp_${exp.id}_description`)} className="text-xs leading-relaxed text-slate-500" />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+
+                <div className="col-span-5 space-y-12">
+                  <section className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-50">
+                    <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} isExample={!modifiedFields.has('title_skills')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-6" />
+                    <div className="flex flex-wrap gap-3">
+                      {data.skills.map((s, i) => (
+                        <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} isExample={!modifiedFields.has(`skills_${i}`)} className="px-4 py-2 bg-slate-50 rounded-2xl text-[10px] font-bold text-slate-600 shadow-sm border border-white" />
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="px-4 space-y-6">
+                    <div className="flex items-center gap-4 p-3 bg-slate-50/50 rounded-2xl border border-white">
+                      <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-blue-500"><Mail size={18} /></div>
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Email<br /><span className="text-slate-900 text-xs lowercase"><Editable tag="span" value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} /></span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 p-3 bg-slate-50/50 rounded-2xl border border-white">
+                      <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-blue-500"><Phone size={18} /></div>
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Phone<br /><span className="text-slate-900 text-xs"><Editable tag="span" value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} /></span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
           </div>
         );
       case 'classic':
@@ -1888,7 +2256,7 @@ const App: React.FC = () => {
               <p className="text-slate-500 font-medium italic">Seleziona o desenho che meglio rappresenta sua carriera</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {(['europass', 'modern', 'classic', 'minimal', 'creative', 'corporate', 'elegant', 'tech', 'sidebar'] as CVTemplate[]).map(t => (
+              {(['executivepro', 'neoclassic', 'architectural', 'softui', 'europass', 'modern', 'classic', 'minimal', 'creative', 'corporate', 'elegant', 'tech', 'sidebar'] as CVTemplate[]).map(t => (
                 <button 
                   key={t}
                   onClick={() => {

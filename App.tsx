@@ -895,6 +895,22 @@ const App: React.FC = () => {
         setIsGeneratingPDF(false);
         return;
       }
+
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'fixed';
+      wrapper.style.left = '-10000px';
+      wrapper.style.top = '0';
+      wrapper.style.width = '210mm';
+      wrapper.style.zIndex = '-1';
+      wrapper.setAttribute('data-html2pdf-wrapper', 'true');
+
+      const clone = element.cloneNode(true) as HTMLElement;
+      clone.style.width = '210mm';
+      clone.style.maxWidth = '210mm';
+      clone.style.margin = '0';
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+
       const opt = {
         margin: 0,
         filename: `CV_${data.fullName.replace(/\s+/g, '_')}.pdf`,
@@ -902,10 +918,13 @@ const App: React.FC = () => {
         html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
-      html2pdf().set(opt).from(element).save().then(() => {
+
+      html2pdf().set(opt).from(clone).save().then(() => {
+        if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
         setIsGeneratingPDF(false);
       }).catch((err: any) => {
         console.error("PDF Error:", err);
+        if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
         setIsGeneratingPDF(false);
       });
     });

@@ -1093,7 +1093,10 @@ const App: React.FC = () => {
     });
   };
 
-  const renderSocials = (isDark: boolean = false) => {
+  const renderSocials = (
+    isDark: boolean = false,
+    options?: { containerClassName?: string; itemClassName?: string; editableClassName?: string }
+  ) => {
     const socials = [
       { id: 'linkedin', value: data.linkedin, icon: <Linkedin className="w-3 h-3" /> },
       { id: 'github', value: data.github, icon: <Github className="w-3 h-3" /> },
@@ -1105,14 +1108,20 @@ const App: React.FC = () => {
     if (socials.length === 0) return null;
 
     return (
-      <div className={`flex flex-wrap gap-x-6 gap-y-2 ${isDark ? 'text-blue-400' : 'text-slate-500'}`}>
+      <div
+        className={`flex flex-wrap gap-x-6 gap-y-2 ${isDark ? 'text-blue-400' : 'text-slate-500'} ${options?.containerClassName ?? ''}`}
+      >
         {socials.map(s => (
-          <div key={s.id} className="flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase">
+          <div
+            key={s.id}
+            className={`flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase ${options?.itemClassName ?? ''}`}
+          >
             {s.icon}{' '}
             <Editable
               value={s.value}
               onChange={v => handleUpdate(s.id as any, v)}
               isExample={!modifiedFields.has(s.id)}
+              className={options?.editableClassName}
             />
           </div>
         ))}
@@ -1366,8 +1375,12 @@ const App: React.FC = () => {
                     isExample={!modifiedFields.has('title_social')}
                     className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6"
                   />
-                  <div className="text-[10px] font-bold text-slate-600">
-                    {renderSocials()}
+                  <div className="text-[9px] font-bold text-slate-600 leading-tight">
+                    {renderSocials(false, {
+                      containerClassName: 'max-w-full',
+                      itemClassName: 'max-w-full',
+                      editableClassName: 'break-all'
+                    })}
                   </div>
                 </section>
               </aside>
@@ -1469,8 +1482,12 @@ const App: React.FC = () => {
                         isExample={!modifiedFields.has('title_social')}
                         className="text-xs font-black uppercase tracking-[0.4em] mb-6 text-[#8b0000] border-b border-[#d4af37]/30 pb-2"
                       />
-                      <div className="text-[10px] uppercase font-bold tracking-widest text-[#555] space-y-2">
-                        {renderSocials()}
+                      <div className="text-[9px] uppercase font-bold tracking-widest text-[#555] space-y-1 leading-tight">
+                        {renderSocials(false, {
+                          containerClassName: 'max-w-full',
+                          itemClassName: 'max-w-full',
+                          editableClassName: 'break-all'
+                        })}
                       </div>
                     </section>
                   </div>
@@ -1551,8 +1568,12 @@ const App: React.FC = () => {
                       <div className="h-1 w-8 bg-blue-600" />
                     </div>
                     <div className="col-span-2">
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                        {renderSocials()}
+                      <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500 leading-tight">
+                        {renderSocials(false, {
+                          containerClassName: 'max-w-full',
+                          itemClassName: 'max-w-full',
+                          editableClassName: 'break-all'
+                        })}
                       </div>
                     </div>
                   </section>
@@ -1642,8 +1663,12 @@ const App: React.FC = () => {
 
                   <section className="px-4">
                     <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} isExample={!modifiedFields.has('title_social')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-4" />
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                      {renderSocials()}
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500 leading-tight">
+                      {renderSocials(false, {
+                        containerClassName: 'max-w-full',
+                        itemClassName: 'max-w-full',
+                        editableClassName: 'break-all'
+                      })}
                     </div>
                   </section>
                 </div>

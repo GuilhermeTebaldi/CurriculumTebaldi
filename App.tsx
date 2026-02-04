@@ -502,7 +502,6 @@ const PhotoUploadButton: React.FC<{
 }> = ({ onClick, className, iconSize = 16 }) => (
   <button
     onClick={onClick}
-    data-html2canvas-ignore="true"
     className={`absolute bottom-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center opacity-100 md:opacity-0 md:group-hover/img:opacity-100 transition ${className ?? ''}`}
     title="Carica foto"
     type="button"
@@ -972,7 +971,9 @@ const App: React.FC = () => {
                   onPositionChange={val => handleUpdate('profileImagePos', val)}
                   fallback={<User className="w-full h-full p-4 opacity-50" />}
                 />
-                <PhotoUploadButton onClick={() => fileInputRef.current?.click()} iconSize={14} className="w-6 h-6" />
+                {!isGeneratingPDF && (
+                  <PhotoUploadButton onClick={() => fileInputRef.current?.click()} iconSize={14} className="w-6 h-6" />
+                )}
               </div>
             </header>
 
@@ -1190,7 +1191,7 @@ const App: React.FC = () => {
                   onPositionChange={val => handleUpdate('profileImagePos', val)}
                   grayscale
                 />
-                <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />
+                {!isGeneratingPDF && <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />}
               </div>
               <div className="space-y-8 w-full">
                 <section>
@@ -1264,7 +1265,7 @@ const App: React.FC = () => {
                        onPositionChange={val => handleUpdate('profileImagePos', val)}
                        fallback={<User className="text-white" size={48} />}
                      />
-                     <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />
+                     {!isGeneratingPDF && <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />}
                   </div>
                 </div>
                 
@@ -1501,7 +1502,7 @@ const App: React.FC = () => {
                      position={data.profileImagePos}
                      onPositionChange={val => handleUpdate('profileImagePos', val)}
                    />
-                   <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />
+                   {!isGeneratingPDF && <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />}
                 </div>
                 <div className="space-y-8 flex-1">
                    <section>
@@ -1584,7 +1585,7 @@ const App: React.FC = () => {
                     onPositionChange={val => handleUpdate('profileImagePos', val)}
                     fallback={<div className="w-full h-full flex items-center justify-center text-slate-300"><User size={64} /></div>}
                   />
-                  <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />
+                  {!isGeneratingPDF && <PhotoUploadButton onClick={() => fileInputRef.current?.click()} />}
                 </div>
               </div>
             </header>

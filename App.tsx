@@ -29,6 +29,8 @@ import {
 } from 'lucide-react';
 import { CVData, WorkExperience, Education, CVTemplate, SectionTitles } from './types';
 import { optimizeText } from './services/geminiService';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 declare var html2pdf: any;
 
@@ -897,68 +899,79 @@ const App: React.FC = () => {
         return;
       }
 
+      const originalRemoveChild = Node.prototype.removeChild;
+      let restoreScheduled = false;
+      const scheduleRestore = () => {
+        if (restoreScheduled) return;
+        restoreScheduled = true;
+        window.setTimeout(() => {
+          Node.prototype.removeChild = originalRemoveChild;
+        }, 2000);
+      };
+
+      Node.prototype.removeChild = function (child: Node) {
+        try {
+          return originalRemoveChild.call(this, child);
+        } catch (err) {
+          return child;
+        }
+      };
+
       const wrapper = document.createElement('div');
       wrapper.style.position = 'fixed';
       wrapper.style.left = '-10000px';
       wrapper.style.top = '0';
       wrapper.style.width = '210mm';
+      wrapper.style.height = '297mm';
       wrapper.style.zIndex = '-1';
 
       const clone = element.cloneNode(true) as HTMLElement;
       clone.removeAttribute('id');
       clone.style.width = '210mm';
       clone.style.maxWidth = '210mm';
+      clone.style.height = '297mm';
+      clone.style.maxHeight = '297mm';
+      clone.style.overflow = 'hidden';
       clone.style.margin = '0';
       wrapper.appendChild(clone);
       document.body.appendChild(wrapper);
 
       const filename = `CV_${data.fullName.replace(/\s+/g, '_')}.pdf`;
-      const html2canvas = (window as any).html2canvas;
-      const jsPDFCtor = (window as any).jspdf?.jsPDF || (window as any).jsPDF;
 
       const cleanup = () => {
         if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
         setIsGeneratingPDF(false);
+        scheduleRestore();
       };
 
-      if (typeof html2canvas === 'function' && typeof jsPDFCtor === 'function') {
-        html2canvas(clone, {
-          scale: 2,
-          useCORS: true,
-          letterRendering: true,
-          scrollX: 0,
-          scrollY: 0
+      html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        scrollX: 0,
+        scrollY: 0
+      })
+        .then((canvas: HTMLCanvasElement) => {
+          const imgData = canvas.toDataURL('image/jpeg', 0.98);
+          const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+          const pdfWidth = 210;
+          const pdfHeight = 297;
+          const imgWidthPx = canvas.width;
+          const imgHeightPx = canvas.height;
+          const scale = Math.min(pdfWidth / imgWidthPx, pdfHeight / imgHeightPx);
+          const renderWidth = imgWidthPx * scale;
+          const renderHeight = imgHeightPx * scale;
+          const x = (pdfWidth - renderWidth) / 2;
+          const y = (pdfHeight - renderHeight) / 2;
+          pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight);
+          pdf.save(filename);
         })
-          .then((canvas: HTMLCanvasElement) => {
-            const imgData = canvas.toDataURL('image/jpeg', 0.98);
-            const pdf = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-            const pdfWidth = 210;
-            const pdfHeight = 297;
-            const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-            let renderWidth = pdfWidth;
-            let renderHeight = imgHeight;
-            let x = 0;
-            let y = 0;
-            if (renderHeight > pdfHeight) {
-              const scale = pdfHeight / renderHeight;
-              renderWidth = renderWidth * scale;
-              renderHeight = renderHeight * scale;
-              x = (pdfWidth - renderWidth) / 2;
-            }
-            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight);
-            pdf.save(filename);
-          })
-          .catch((err: any) => {
-            console.error("PDF Error:", err);
-          })
-          .finally(() => {
-            cleanup();
-          });
-        return;
-      }
-
-      console.error("PDF Error: html2canvas/jsPDF not available.");
-      cleanup();
+        .catch((err: any) => {
+          console.error("PDF Error:", err);
+        })
+        .finally(() => {
+          cleanup();
+        });
     });
   };
 

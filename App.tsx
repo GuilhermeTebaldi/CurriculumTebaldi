@@ -896,22 +896,12 @@ const App: React.FC = () => {
         return;
       }
 
-      const originalRemoveChild = Node.prototype.removeChild;
-      Node.prototype.removeChild = function (child: Node) {
-        try {
-          return originalRemoveChild.call(this, child);
-        } catch (err) {
-          return child;
-        }
-      };
-
       const wrapper = document.createElement('div');
       wrapper.style.position = 'fixed';
       wrapper.style.left = '-10000px';
       wrapper.style.top = '0';
       wrapper.style.width = '210mm';
       wrapper.style.zIndex = '-1';
-      wrapper.setAttribute('data-html2pdf-wrapper', 'true');
 
       const clone = element.cloneNode(true) as HTMLElement;
       clone.removeAttribute('id');
@@ -921,23 +911,62 @@ const App: React.FC = () => {
       wrapper.appendChild(clone);
       document.body.appendChild(wrapper);
 
+      const filename = `CV_${data.fullName.replace(/\s+/g, '_')}.pdf`;
+      const html2canvas = (window as any).html2canvas;
+      const jsPDFCtor = (window as any).jspdf?.jsPDF || (window as any).jsPDF;
+
+      const cleanup = () => {
+        if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+        setIsGeneratingPDF(false);
+      };
+
+      if (typeof html2canvas === 'function' && typeof jsPDFCtor === 'function') {
+        html2canvas(clone, {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          scrollX: 0,
+          scrollY: 0
+        })
+          .then((canvas: HTMLCanvasElement) => {
+            const imgData = canvas.toDataURL('image/jpeg', 0.98);
+            const pdf = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+            const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+            let renderWidth = pdfWidth;
+            let renderHeight = imgHeight;
+            let x = 0;
+            let y = 0;
+            if (renderHeight > pdfHeight) {
+              const scale = pdfHeight / renderHeight;
+              renderWidth = renderWidth * scale;
+              renderHeight = renderHeight * scale;
+              x = (pdfWidth - renderWidth) / 2;
+            }
+            pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight);
+            pdf.save(filename);
+          })
+          .catch((err: any) => {
+            console.error("PDF Error:", err);
+          })
+          .finally(() => {
+            cleanup();
+          });
+        return;
+      }
+
       const opt = {
         margin: 0,
-        filename: `CV_${data.fullName.replace(/\s+/g, '_')}.pdf`,
+        filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0, removeContainer: false },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      html2pdf().set(opt).from(clone).save().then(() => {
-        if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
-        setIsGeneratingPDF(false);
-      }).catch((err: any) => {
+      html2pdf().set(opt).from(clone).save().then(cleanup).catch((err: any) => {
         console.error("PDF Error:", err);
-        if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
-        setIsGeneratingPDF(false);
-      }).finally(() => {
-        Node.prototype.removeChild = originalRemoveChild;
+        cleanup();
       });
     });
   };

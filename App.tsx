@@ -2433,7 +2433,7 @@ const App: React.FC = () => {
       <aside className="w-full md:w-1/3 bg-slate-900 text-white p-6 overflow-y-auto no-print border-r border-slate-800 scrollbar-hide">
         <div className="flex items-center gap-2 mb-8 sticky top-0 bg-slate-900 z-10 py-2">
           <Sparkles className="text-yellow-400" />
-          <h1 className="text-2xl font-bold">CV Editor Italia</h1>
+          <h1 className="text-2xl font-bold">CURRICULOGUI</h1>
         </div>
 
         <div className="space-y-8 pb-20">

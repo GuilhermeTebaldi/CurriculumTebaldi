@@ -451,6 +451,7 @@ const ProfilePhoto: React.FC<{
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!src || !onPositionChange) return;
+    if ((e.target as HTMLElement).closest('button')) return;
     dragRef.current = { startY: e.clientY, startPos: position };
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
@@ -956,18 +957,8 @@ const App: React.FC = () => {
         return;
       }
 
-      const opt = {
-        margin: 0,
-        filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      html2pdf().set(opt).from(clone).save().then(cleanup).catch((err: any) => {
-        console.error("PDF Error:", err);
-        cleanup();
-      });
+      console.error("PDF Error: html2canvas/jsPDF not available.");
+      cleanup();
     });
   };
 

@@ -1649,8 +1649,17 @@ const App: React.FC = () => {
                   <section className="px-4 space-y-6">
                     <div className="flex items-center gap-4 p-3 bg-slate-50/50 rounded-2xl border border-white">
                       <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-blue-500"><Mail size={18} /></div>
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">
-                        Email<br /><span className="text-slate-900 text-xs lowercase"><Editable tag="span" value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} /></span>
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight max-w-full">
+                        Email<br />
+                        <span className="text-slate-900 text-xs lowercase break-all">
+                          <Editable
+                            tag="span"
+                            value={data.email}
+                            onChange={v => handleUpdate('email', v)}
+                            isExample={!modifiedFields.has('email')}
+                            className="break-all"
+                          />
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 p-3 bg-slate-50/50 rounded-2xl border border-white">
@@ -1721,8 +1730,12 @@ const App: React.FC = () => {
                   <Editable tag="h2" value={data.sectionTitles.personalInfo} onChange={v => handleTitleUpdate('personalInfo', v)} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
                   <Editable tag="p" value={data.nationality} onChange={v => handleUpdate('nationality', v)} className="text-xs" />
                   <Editable tag="p" value={data.birthDate} onChange={v => handleUpdate('birthDate', v)} className="text-xs" />
-                  <div className="mt-4 space-y-2">
-                     {renderSocials()}
+                  <div className="mt-4 space-y-2 text-[10px] uppercase font-bold tracking-widest text-slate-500 leading-tight">
+                     {renderSocials(false, {
+                       containerClassName: 'max-w-full',
+                       itemClassName: 'max-w-full',
+                       editableClassName: 'break-all'
+                     })}
                   </div>
                 </section>
                 <section>
@@ -1765,8 +1778,12 @@ const App: React.FC = () => {
                 </section>
                 <section>
                   <Editable tag="h3" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" />
-                  <div className="space-y-2">
-                    {renderSocials()}
+                  <div className="space-y-1 text-[9px] uppercase font-bold tracking-widest text-slate-500 leading-tight">
+                    {renderSocials(false, {
+                      containerClassName: 'max-w-full',
+                      itemClassName: 'max-w-full',
+                      editableClassName: 'break-all'
+                    })}
                   </div>
                 </section>
                 <section>
@@ -2045,7 +2062,11 @@ const App: React.FC = () => {
                       <div className="text-[10px] space-y-2 opacity-60">
                          <p>{locale.template.emailLabel}: <Editable tag="span" value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} /></p>
                          <div className="pt-2 flex flex-col gap-1">
-                           {renderSocials(true)}
+                           {renderSocials(true, {
+                             containerClassName: 'max-w-full',
+                             itemClassName: 'max-w-full',
+                             editableClassName: 'break-all'
+                           })}
                          </div>
                       </div>
                    </section>

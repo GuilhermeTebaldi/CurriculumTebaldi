@@ -896,6 +896,15 @@ const App: React.FC = () => {
         return;
       }
 
+      const originalRemoveChild = Node.prototype.removeChild;
+      Node.prototype.removeChild = function (child: Node) {
+        try {
+          return originalRemoveChild.call(this, child);
+        } catch (err) {
+          return child;
+        }
+      };
+
       const wrapper = document.createElement('div');
       wrapper.style.position = 'fixed';
       wrapper.style.left = '-10000px';
@@ -905,6 +914,7 @@ const App: React.FC = () => {
       wrapper.setAttribute('data-html2pdf-wrapper', 'true');
 
       const clone = element.cloneNode(true) as HTMLElement;
+      clone.removeAttribute('id');
       clone.style.width = '210mm';
       clone.style.maxWidth = '210mm';
       clone.style.margin = '0';
@@ -915,7 +925,7 @@ const App: React.FC = () => {
         margin: 0,
         filename: `CV_${data.fullName.replace(/\s+/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0, removeContainer: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
@@ -926,6 +936,8 @@ const App: React.FC = () => {
         console.error("PDF Error:", err);
         if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
         setIsGeneratingPDF(false);
+      }).finally(() => {
+        Node.prototype.removeChild = originalRemoveChild;
       });
     });
   };

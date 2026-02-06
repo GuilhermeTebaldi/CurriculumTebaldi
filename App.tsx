@@ -722,8 +722,6 @@ const App: React.FC = () => {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
-  const [mobileToolsTab, setMobileToolsTab] = useState<'add' | 'remove'>('add');
   const [language, setLanguage] = useState<Language>('it');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const isGeneratingPDFRef = useRef(false);
@@ -2243,150 +2241,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Mobile-only resume controls (add/remove) to preserve the desktop layout.
-  const renderMobileCvTools = () => {
-    if (isGeneratingPDF) return null;
-
-    return (
-      <div className="md:hidden fixed bottom-4 right-4 z-20 no-print" data-html2canvas-ignore="true">
-        <div className={`mb-3 w-72 max-w-[90vw] rounded-2xl bg-white/95 backdrop-blur border border-slate-200 shadow-xl p-3 transition-all ${isMobileToolsOpen ? 'opacity-100 translate-y-0' : 'opacity-0 pointer-events-none translate-y-2'}`}>
-          <div className="flex gap-2 mb-3">
-            <button
-              onClick={() => setMobileToolsTab('add')}
-              className={`flex-1 text-[10px] uppercase tracking-widest font-black rounded-lg px-2 py-1.5 ${mobileToolsTab === 'add' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
-            >
-              {locale.ui.addTab}
-            </button>
-            <button
-              onClick={() => setMobileToolsTab('remove')}
-              className={`flex-1 text-[10px] uppercase tracking-widest font-black rounded-lg px-2 py-1.5 ${mobileToolsTab === 'remove' ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600'}`}
-            >
-              {locale.ui.removeTab}
-            </button>
-          </div>
-
-          {mobileToolsTab === 'add' ? (
-            <div className="grid gap-2">
-              <button onClick={addExperience} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                {locale.ui.addExperience} <Plus className="w-3 h-3" />
-              </button>
-              <button onClick={addEducation} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                {locale.ui.addEducation} <Plus className="w-3 h-3" />
-              </button>
-              <button onClick={() => addListItem('skills')} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                {locale.ui.addSkills} <Plus className="w-3 h-3" />
-              </button>
-              <button onClick={() => addListItem('languages')} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                {locale.ui.addLanguages} <Plus className="w-3 h-3" />
-              </button>
-              <button onClick={() => addListItem('softSkills')} className="flex items-center justify-between w-full text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                {locale.ui.addSoftSkills} <Plus className="w-3 h-3" />
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-              <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.experiencesLabel}</p>
-                {data.experiences.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">{locale.ui.emptyExperience}</p>
-                ) : (
-                  data.experiences.map(exp => (
-                    <button
-                      key={exp.id}
-                      onClick={() => removeExperience(exp.id)}
-                      className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
-                    >
-                      <span className="truncate">{exp.role || exp.company || locale.ui.addExperience}</span>
-                      <Trash2 className="w-3 h-3 text-red-500" />
-                    </button>
-                  ))
-                )}
-              </div>
-
-              <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.educationLabel}</p>
-                {data.education.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">{locale.ui.emptyEducation}</p>
-                ) : (
-                  data.education.map(edu => (
-                    <button
-                      key={edu.id}
-                      onClick={() => removeEducation(edu.id)}
-                      className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
-                    >
-                      <span className="truncate">{edu.degree || edu.school || locale.ui.addEducation}</span>
-                      <Trash2 className="w-3 h-3 text-red-500" />
-                    </button>
-                  ))
-                )}
-              </div>
-
-              <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.skillsLabel}</p>
-                {data.skills.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">{locale.ui.emptySkills}</p>
-                ) : (
-                  data.skills.map((skill, idx) => (
-                    <button
-                      key={`skills_${idx}`}
-                      onClick={() => removeListItem('skills', idx)}
-                      className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
-                    >
-                      <span className="truncate">{skill.trim() || locale.ui.emptySkillFallback}</span>
-                      <Trash2 className="w-3 h-3 text-red-500" />
-                    </button>
-                  ))
-                )}
-              </div>
-
-              <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.languagesLabel}</p>
-                {data.languages.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">{locale.ui.emptyLanguages}</p>
-                ) : (
-                  data.languages.map((lang, idx) => (
-                    <button
-                      key={`languages_${idx}`}
-                      onClick={() => removeListItem('languages', idx)}
-                      className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
-                    >
-                      <span className="truncate">{lang.trim() || locale.ui.emptyLanguageFallback}</span>
-                      <Trash2 className="w-3 h-3 text-red-500" />
-                    </button>
-                  ))
-                )}
-              </div>
-
-              <div>
-                <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 mb-1">{locale.ui.softSkillsLabel}</p>
-                {data.softSkills.length === 0 ? (
-                  <p className="text-[10px] text-slate-400">{locale.ui.emptySoftSkills}</p>
-                ) : (
-                  data.softSkills.map((skill, idx) => (
-                    <button
-                      key={`softSkills_${idx}`}
-                      onClick={() => removeListItem('softSkills', idx)}
-                      className="flex items-center justify-between w-full text-[11px] px-2 py-1.5 rounded-md bg-slate-50 text-slate-700 border border-slate-100"
-                    >
-                      <span className="truncate">{skill.trim() || locale.ui.emptySoftSkillFallback}</span>
-                      <Trash2 className="w-3 h-3 text-red-500" />
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => setIsMobileToolsOpen(prev => !prev)}
-          className="w-12 h-12 rounded-full bg-blue-600 text-white shadow-lg flex items-center justify-center"
-        >
-          {isMobileToolsOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-        </button>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row relative">
@@ -2651,7 +2505,6 @@ const App: React.FC = () => {
           >
             {renderTemplate()}
           </div>
-          {renderMobileCvTools()}
         </div>
       </main>
     </div>

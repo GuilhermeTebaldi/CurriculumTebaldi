@@ -367,7 +367,7 @@ const LOCALES: Record<Language, {
 const INITIAL_DATA: CVData = {
   fullName: "Guilherme Tebaldi",
   role: "Full Stack Developer & Marketing Specialist",
-  email: "guilherme.tebaldi@email.com",
+  email: "tebaldiguilherme.roma@gmail.com",
   phone: "+39 123 456 7890",
   location: "Italia / Remoto",
   nationality: "Brasiliano",

@@ -14,7 +14,15 @@ export interface Education {
   year: string;
 }
 
-export type CVTemplate = 'modern' | 'classic' | 'minimal' | 'creative' | 'corporate' | 'elegant' | 'tech' | 'sidebar' | 'europass' | 'executivepro' | 'neoclassic' | 'architectural' | 'softui';
+export interface LanguageSkill {
+  id: string;
+  language: string;
+  comprehension: string;
+  speaking: string;
+  writing: string;
+}
+
+export type CVTemplate = 'modern' | 'classic' | 'minimal' | 'creative' | 'corporate' | 'elegant' | 'tech' | 'sidebar' | 'europass' | 'blueclassic' | 'executivepro' | 'neoclassic' | 'architectural' | 'softui';
 
 export interface SectionTitles {
   experience: string;
@@ -50,5 +58,10 @@ export interface CVData {
   skills: string[];
   languages: string[];
   softSkills: string[];
+  languageSkills: LanguageSkill[];
+  digitalSkills: string[];
+  organizationalSkills: string[];
+  professionalSkills: string[];
+  additionalInfo: string[];
   sectionTitles: SectionTitles;
 }

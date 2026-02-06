@@ -29,7 +29,7 @@ import {
   Twitter,
   Settings2
 } from 'lucide-react';
-import { CVData, WorkExperience, Education, CVTemplate, SectionTitles } from './types';
+import { CVData, WorkExperience, Education, CVTemplate, SectionTitles, LanguageSkill } from './types';
 import { optimizeText } from './services/geminiService';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -40,13 +40,38 @@ type Language = 'it' | 'pt' | 'en' | 'es';
 
 const STORAGE_KEY = 'cv_editor_data_v1';
 
+const getTemplateLabel = (template: CVTemplate) => template;
+
+// Europass-specific defaults for CEFR language table.
+const DEFAULT_LANGUAGE_LEVELS = {
+  comprehension: 'B1',
+  speaking: 'B1',
+  writing: 'B1'
+};
+
+const createLanguageSkill = (language: string, id: string = Date.now().toString()): LanguageSkill => ({
+  id,
+  language,
+  ...DEFAULT_LANGUAGE_LEVELS
+});
+
+const DEFAULT_LANGUAGE_SKILLS: LanguageSkill[] = [createLanguageSkill('Italiano', 'lang-1')];
+
 const LOCALES: Record<Language, {
   label: string;
   sectionTitles: SectionTitles;
   defaults: {
     experience: { company: string; role: string; period: string; description: string };
     education: { school: string; degree: string; year: string };
-    listItems: { skills: string; languages: string; softSkills: string };
+    listItems: {
+      skills: string;
+      languages: string;
+      softSkills: string;
+      digitalSkills: string;
+      organizationalSkills: string;
+      professionalSkills: string;
+      additionalInfo: string;
+    };
     websiteLabel: string;
   };
   template: {
@@ -57,6 +82,37 @@ const LOCALES: Record<Language, {
     stackLabel: string;
     networkLabel: string;
     emailLabel: string;
+  };
+  europass: {
+    personalInfo: string;
+    profile: string;
+    experience: string;
+    education: string;
+    languageSkills: string;
+    digitalSkills: string;
+    organizationalSkills: string;
+    professionalSkills: string;
+    additionalInfo: string;
+    labels: {
+      fullName: string;
+      role: string;
+      location: string;
+      phone: string;
+      email: string;
+      nationality: string;
+      birthDate: string;
+      portfolio: string;
+      linkedin: string;
+      github: string;
+      instagram: string;
+      twitter: string;
+    };
+    languageTable: {
+      language: string;
+      comprehension: string;
+      speaking: string;
+      writing: string;
+    };
   };
   ui: {
     language: string;
@@ -114,7 +170,11 @@ const LOCALES: Record<Language, {
       listItems: {
         skills: "Nuova competenza",
         languages: "Nuova lingua",
-        softSkills: "Nuova soft skill"
+        softSkills: "Nuova soft skill",
+        digitalSkills: "Nuova competenza digitale",
+        organizationalSkills: "Nuova competenza organizzativa",
+        professionalSkills: "Nuova competenza professionale",
+        additionalInfo: "Nuova informazione"
       },
       websiteLabel: "Sito Web"
     },
@@ -126,6 +186,37 @@ const LOCALES: Record<Language, {
       stackLabel: "Stack",
       networkLabel: "Rete",
       emailLabel: "email"
+    },
+    europass: {
+      personalInfo: "Informazioni personali",
+      profile: "Profilo professionale",
+      experience: "Esperienza lavorativa",
+      education: "Istruzione e formazione",
+      languageSkills: "Competenze linguistiche",
+      digitalSkills: "Competenze digitali",
+      organizationalSkills: "Competenze organizzative",
+      professionalSkills: "Competenze professionali",
+      additionalInfo: "Ulteriori informazioni",
+      labels: {
+        fullName: "Nome e cognome",
+        role: "Titolo professionale",
+        location: "Indirizzo",
+        phone: "Telefono",
+        email: "Email",
+        nationality: "Nazionalità",
+        birthDate: "Data di nascita",
+        portfolio: "Sito web",
+        linkedin: "LinkedIn",
+        github: "GitHub",
+        instagram: "Instagram",
+        twitter: "Twitter/X"
+      },
+      languageTable: {
+        language: "Lingua",
+        comprehension: "Comprensione",
+        speaking: "Parlato",
+        writing: "Scrittura"
+      }
     },
     ui: {
       language: "Lingua",
@@ -183,7 +274,11 @@ const LOCALES: Record<Language, {
       listItems: {
         skills: "Nova competência",
         languages: "Novo idioma",
-        softSkills: "Nova soft skill"
+        softSkills: "Nova soft skill",
+        digitalSkills: "Nova competência digital",
+        organizationalSkills: "Nova competência organizacional",
+        professionalSkills: "Nova competência profissional",
+        additionalInfo: "Nova informação"
       },
       websiteLabel: "Site"
     },
@@ -195,6 +290,37 @@ const LOCALES: Record<Language, {
       stackLabel: "Stack",
       networkLabel: "Rede",
       emailLabel: "email"
+    },
+    europass: {
+      personalInfo: "Informações pessoais",
+      profile: "Perfil profissional",
+      experience: "Experiência profissional",
+      education: "Educação e formação",
+      languageSkills: "Competências linguísticas",
+      digitalSkills: "Competências digitais",
+      organizationalSkills: "Competências organizacionais",
+      professionalSkills: "Competências profissionais",
+      additionalInfo: "Informações adicionais",
+      labels: {
+        fullName: "Nome completo",
+        role: "Título profissional",
+        location: "Endereço",
+        phone: "Telefone",
+        email: "Email",
+        nationality: "Nacionalidade",
+        birthDate: "Data de nascimento",
+        portfolio: "Site",
+        linkedin: "LinkedIn",
+        github: "GitHub",
+        instagram: "Instagram",
+        twitter: "Twitter/X"
+      },
+      languageTable: {
+        language: "Língua",
+        comprehension: "Compreensão",
+        speaking: "Fala",
+        writing: "Escrita"
+      }
     },
     ui: {
       language: "Idioma",
@@ -252,7 +378,11 @@ const LOCALES: Record<Language, {
       listItems: {
         skills: "New skill",
         languages: "New language",
-        softSkills: "New soft skill"
+        softSkills: "New soft skill",
+        digitalSkills: "New digital skill",
+        organizationalSkills: "New organizational skill",
+        professionalSkills: "New professional skill",
+        additionalInfo: "New information"
       },
       websiteLabel: "Website"
     },
@@ -264,6 +394,37 @@ const LOCALES: Record<Language, {
       stackLabel: "Stack",
       networkLabel: "Network",
       emailLabel: "email"
+    },
+    europass: {
+      personalInfo: "Personal information",
+      profile: "Professional profile",
+      experience: "Work experience",
+      education: "Education and training",
+      languageSkills: "Language skills",
+      digitalSkills: "Digital skills",
+      organizationalSkills: "Organizational skills",
+      professionalSkills: "Professional skills",
+      additionalInfo: "Additional information",
+      labels: {
+        fullName: "Full name",
+        role: "Professional title",
+        location: "Address",
+        phone: "Phone",
+        email: "Email",
+        nationality: "Nationality",
+        birthDate: "Date of birth",
+        portfolio: "Website",
+        linkedin: "LinkedIn",
+        github: "GitHub",
+        instagram: "Instagram",
+        twitter: "Twitter/X"
+      },
+      languageTable: {
+        language: "Language",
+        comprehension: "Comprehension",
+        speaking: "Speaking",
+        writing: "Writing"
+      }
     },
     ui: {
       language: "Language",
@@ -321,7 +482,11 @@ const LOCALES: Record<Language, {
       listItems: {
         skills: "Nueva habilidad",
         languages: "Nuevo idioma",
-        softSkills: "Nueva soft skill"
+        softSkills: "Nueva soft skill",
+        digitalSkills: "Nueva habilidad digital",
+        organizationalSkills: "Nueva habilidad organizativa",
+        professionalSkills: "Nueva habilidad profesional",
+        additionalInfo: "Nueva información"
       },
       websiteLabel: "Sitio web"
     },
@@ -333,6 +498,37 @@ const LOCALES: Record<Language, {
       stackLabel: "Stack",
       networkLabel: "Red",
       emailLabel: "email"
+    },
+    europass: {
+      personalInfo: "Información personal",
+      profile: "Perfil profesional",
+      experience: "Experiencia laboral",
+      education: "Educación y formación",
+      languageSkills: "Competencias lingüísticas",
+      digitalSkills: "Competencias digitales",
+      organizationalSkills: "Competencias organizativas",
+      professionalSkills: "Competencias profesionales",
+      additionalInfo: "Información adicional",
+      labels: {
+        fullName: "Nombre completo",
+        role: "Título profesional",
+        location: "Dirección",
+        phone: "Teléfono",
+        email: "Email",
+        nationality: "Nacionalidad",
+        birthDate: "Fecha de nacimiento",
+        portfolio: "Sitio web",
+        linkedin: "LinkedIn",
+        github: "GitHub",
+        instagram: "Instagram",
+        twitter: "Twitter/X"
+      },
+      languageTable: {
+        language: "Idioma",
+        comprehension: "Comprensión",
+        speaking: "Habla",
+        writing: "Escritura"
+      }
     },
     ui: {
       language: "Idioma",
@@ -400,8 +596,55 @@ const INITIAL_DATA: CVData = {
   skills: ["React", "Java", "C#", "Render", "Vercel", "Social Media Management", "Digital Marketing"],
   languages: ["Portoghese (Madrelingua)", "Italiano"],
   softSkills: ["Problem Solving", "Focus Profondo", "Creatività", "Adattabilità"],
+  languageSkills: DEFAULT_LANGUAGE_SKILLS,
+  digitalSkills: ["Pacchetto Office", "Google Workspace", "Excel"],
+  organizationalSkills: ["Gestione del tempo", "Coordinamento team"],
+  professionalSkills: ["Sviluppo software", "Marketing digitale"],
+  additionalInfo: ["Patente B"],
   sectionTitles: { ...LOCALES.it.sectionTitles }
 };
+
+const isLanguageSkill = (item: any): item is LanguageSkill =>
+  item &&
+  typeof item === 'object' &&
+  typeof item.id === 'string' &&
+  typeof item.language === 'string' &&
+  typeof item.comprehension === 'string' &&
+  typeof item.speaking === 'string' &&
+  typeof item.writing === 'string';
+
+const coerceLanguageSkills = (value: any, fallbackLanguages: string[]): LanguageSkill[] => {
+  if (Array.isArray(value) && value.every(isLanguageSkill)) return value;
+  if (Array.isArray(fallbackLanguages) && fallbackLanguages.length > 0) {
+    return fallbackLanguages.map((lang, idx) => createLanguageSkill(lang, `lang-${idx + 1}`));
+  }
+  return DEFAULT_LANGUAGE_SKILLS;
+};
+
+const mergeWithDefaults = (incoming: CVData): CVData => ({
+  ...INITIAL_DATA,
+  ...incoming,
+  sectionTitles: { ...INITIAL_DATA.sectionTitles, ...(incoming.sectionTitles ?? {}) },
+  experiences: Array.isArray(incoming.experiences) ? incoming.experiences : INITIAL_DATA.experiences,
+  education: Array.isArray(incoming.education) ? incoming.education : INITIAL_DATA.education,
+  skills: Array.isArray(incoming.skills) ? incoming.skills : INITIAL_DATA.skills,
+  languages: Array.isArray(incoming.languages) ? incoming.languages : INITIAL_DATA.languages,
+  softSkills: Array.isArray(incoming.softSkills) ? incoming.softSkills : INITIAL_DATA.softSkills,
+  languageSkills: coerceLanguageSkills((incoming as any).languageSkills, incoming.languages ?? []),
+  digitalSkills: Array.isArray((incoming as any).digitalSkills)
+    ? (incoming as any).digitalSkills
+    : (Array.isArray(incoming.skills) ? incoming.skills : INITIAL_DATA.digitalSkills),
+  organizationalSkills: Array.isArray((incoming as any).organizationalSkills)
+    ? (incoming as any).organizationalSkills
+    : (Array.isArray(incoming.softSkills) ? incoming.softSkills : INITIAL_DATA.organizationalSkills),
+  professionalSkills: Array.isArray((incoming as any).professionalSkills)
+    ? (incoming as any).professionalSkills
+    : (Array.isArray(incoming.skills) ? incoming.skills : INITIAL_DATA.professionalSkills),
+  additionalInfo: Array.isArray((incoming as any).additionalInfo)
+    ? (incoming as any).additionalInfo
+    : INITIAL_DATA.additionalInfo,
+  profileImagePos: typeof incoming.profileImagePos === 'number' ? incoming.profileImagePos : 50
+});
 
 const Editable: React.FC<{
   value: string;
@@ -576,6 +819,24 @@ const TemplateDrawing: React.FC<{ type: CVTemplate }> = ({ type }) => {
       );
     case 'europass':
       return (
+        <div className="w-full h-full bg-white p-1 flex flex-col gap-1 border border-slate-200">
+          <div className="h-1 bg-slate-800 w-1/2" />
+          <div className="h-0.5 bg-slate-200 w-full" />
+          <div className="space-y-0.5">
+            <div className="h-0.5 bg-slate-200 w-1/3" />
+            <div className="h-0.5 bg-slate-100 w-full" />
+            <div className="h-0.5 bg-slate-100 w-full" />
+          </div>
+          <div className="h-0.5 bg-slate-200 w-full" />
+          <div className="space-y-0.5">
+            <div className="h-0.5 bg-slate-200 w-1/3" />
+            <div className="h-0.5 bg-slate-100 w-full" />
+            <div className="h-0.5 bg-slate-100 w-full" />
+          </div>
+        </div>
+      );
+    case 'blueclassic':
+      return (
         <div className="w-full h-full bg-white p-1 flex flex-col gap-0 border border-slate-200">
           <div className="h-6 bg-[#003399] w-full flex items-center px-1">
             <div className="w-2 h-2 bg-white rounded-full mr-1" />
@@ -729,6 +990,7 @@ const App: React.FC = () => {
   const cvRef = useRef<HTMLDivElement>(null);
 
   const locale = LOCALES[language];
+  const isEuropass = data.template === 'europass';
 
   useEffect(() => {
     try {
@@ -737,10 +999,7 @@ const App: React.FC = () => {
       const parsed = JSON.parse(raw);
       if (parsed?.data) {
         const nextData = parsed.data as CVData;
-        setData({
-          ...nextData,
-          profileImagePos: typeof nextData.profileImagePos === 'number' ? nextData.profileImagePos : 50
-        });
+        setData(mergeWithDefaults(nextData));
       }
       if (Array.isArray(parsed?.modifiedFields)) {
         setModifiedFields(new Set<string>(parsed.modifiedFields));
@@ -869,20 +1128,29 @@ const App: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  type ListField =
+    | 'skills'
+    | 'languages'
+    | 'softSkills'
+    | 'digitalSkills'
+    | 'organizationalSkills'
+    | 'professionalSkills'
+    | 'additionalInfo';
+
   const listItemExamples = locale.defaults.listItems;
 
-  const addListItem = (field: 'skills' | 'languages' | 'softSkills') => {
+  const addListItem = (field: ListField) => {
     setData(prev => ({ ...prev, [field]: [...prev[field], listItemExamples[field]] }));
   };
 
-  const updateListItem = (field: 'skills' | 'languages' | 'softSkills', index: number, value: string) => {
+  const updateListItem = (field: ListField, index: number, value: string) => {
     const newList = [...data[field]];
     newList[index] = value;
     setData(prev => ({ ...prev, [field]: newList }));
     setModifiedFields(prev => new Set(prev).add(`${field}_${index}`));
   };
 
-  const removeListItem = (field: 'skills' | 'languages' | 'softSkills', index: number) => {
+  const removeListItem = (field: ListField, index: number) => {
     setData(prev => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index)
@@ -905,6 +1173,58 @@ const App: React.FC = () => {
         } else if (idx > index) {
           next.add(`${field}_${idx - 1}`);
         }
+      });
+      return next;
+    });
+  };
+
+  const renderListEditor = (title: string, field: ListField) => (
+    <section key={field} className="space-y-3">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">
+          {title}
+        </h3>
+        <button onClick={() => addListItem(field)} className="text-blue-400"><Plus className="w-4 h-4" /></button>
+      </div>
+      <div className="space-y-2">
+        {data[field].map((item, idx) => (
+          <div key={idx} className="flex gap-2">
+            <input 
+              className="flex-1 bg-slate-800 border-none rounded-lg p-2 text-sm text-white"
+              value={item}
+              onChange={e => updateListItem(field, idx, e.target.value)}
+              placeholder={`Nuovo item...`}
+            />
+            <button onClick={() => removeListItem(field, idx)} className="text-slate-600 hover:text-red-400 transition"><Trash2 className="w-4 h-4" /></button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+
+  const addLanguageSkill = () => {
+    const newSkill = createLanguageSkill('Italiano');
+    setData(prev => ({ ...prev, languageSkills: [...prev.languageSkills, newSkill] }));
+  };
+
+  const updateLanguageSkill = (id: string, field: keyof Omit<LanguageSkill, 'id'>, value: string) => {
+    setData(prev => ({
+      ...prev,
+      languageSkills: prev.languageSkills.map(skill => skill.id === id ? { ...skill, [field]: value } : skill)
+    }));
+    setModifiedFields(prev => new Set(prev).add(`lang_${id}_${String(field)}`));
+  };
+
+  const removeLanguageSkill = (id: string) => {
+    setData(prev => ({
+      ...prev,
+      languageSkills: prev.languageSkills.filter(skill => skill.id !== id)
+    }));
+    setModifiedFields(prev => {
+      const next = new Set<string>();
+      const prefix = `lang_${id}_`;
+      prev.forEach(key => {
+        if (!key.startsWith(prefix)) next.add(key);
       });
       return next;
     });
@@ -1029,12 +1349,31 @@ const App: React.FC = () => {
       clone.removeAttribute('id');
       clone.style.width = '210mm';
       clone.style.maxWidth = '210mm';
-      clone.style.height = '297mm';
-      clone.style.maxHeight = '297mm';
+      if (data.template === 'europass') {
+        clone.style.height = 'auto';
+        clone.style.maxHeight = 'none';
+      } else {
+        clone.style.height = '297mm';
+        clone.style.maxHeight = '297mm';
+      }
       clone.style.overflow = 'hidden';
       clone.style.margin = '0';
       wrapper.appendChild(clone);
       document.body.appendChild(wrapper);
+      if (data.template === 'europass') {
+        const targetHeight = wrapper.clientHeight || 0;
+        const contentHeight = clone.scrollHeight || 0;
+        if (contentHeight > targetHeight && targetHeight > 0) {
+          const scale = targetHeight / contentHeight;
+          clone.style.transformOrigin = 'top left';
+          clone.style.transform = `scale(${scale})`;
+          clone.style.width = `${210 / scale}mm`;
+          clone.style.height = `${297 / scale}mm`;
+        } else {
+          clone.style.height = '297mm';
+          clone.style.maxHeight = '297mm';
+        }
+      }
 
       const filename = `CV_${data.fullName.replace(/\s+/g, '_')}.pdf`;
 
@@ -1130,9 +1469,263 @@ const App: React.FC = () => {
     const nameParts = data.fullName.split(' ');
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ');
+    const europass = locale.europass;
+    const renderEuropassList = (items: string[], field: ListField, emptyLabel: string) => {
+      if (!items || items.length === 0) {
+        return <p className="text-slate-500 italic">{emptyLabel}</p>;
+      }
+      return (
+        <ul className="list-disc pl-5 space-y-1">
+          {items.map((item, idx) => (
+            <li key={`${field}-${idx}`}>
+              <Editable
+                value={item}
+                onChange={v => updateListItem(field, idx, v)}
+                isExample={!modifiedFields.has(`${field}_${idx}`)}
+              />
+            </li>
+          ))}
+        </ul>
+      );
+    };
 
     switch (data.template) {
       case 'europass':
+        const europassContainerClass = `flex flex-col bg-white min-h-full font-sans text-slate-900 ${
+          isGeneratingPDF ? 'text-[10px] leading-snug p-8 gap-4' : 'text-[11px] leading-relaxed p-10 gap-6'
+        }`;
+        return (
+          <div className={europassContainerClass}>
+            <div className="flex items-start justify-between gap-6">
+              <div className="space-y-1">
+                <Editable
+                  tag="h1"
+                  value={data.fullName}
+                  onChange={v => handleUpdate('fullName', v)}
+                  isExample={!modifiedFields.has('fullName')}
+                  className="text-2xl font-bold"
+                />
+                <Editable
+                  tag="p"
+                  value={data.role}
+                  onChange={v => handleUpdate('role', v)}
+                  isExample={!modifiedFields.has('role')}
+                  className="text-sm"
+                />
+              </div>
+              {data.profileImage && (
+                <div className="w-24 h-24 overflow-hidden border border-slate-300 bg-white">
+                  <ProfilePhoto
+                    src={data.profileImage}
+                    position={data.profileImagePos}
+                    onPositionChange={val => handleUpdate('profileImagePos', val)}
+                    fallback={null}
+                  />
+                </div>
+              )}
+            </div>
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.personalInfo}</h2>
+              <div className="grid grid-cols-[140px_1fr] gap-y-1">
+                {[
+                  { label: europass.labels.fullName, field: 'fullName', value: data.fullName, required: true },
+                  { label: europass.labels.role, field: 'role', value: data.role, required: true },
+                  { label: europass.labels.location, field: 'location', value: data.location },
+                  { label: europass.labels.phone, field: 'phone', value: data.phone },
+                  { label: europass.labels.email, field: 'email', value: data.email },
+                  { label: europass.labels.nationality, field: 'nationality', value: data.nationality },
+                  { label: europass.labels.birthDate, field: 'birthDate', value: data.birthDate },
+                  { label: europass.labels.portfolio, field: 'portfolio', value: data.portfolio },
+                  { label: europass.labels.linkedin, field: 'linkedin', value: data.linkedin }
+                ]
+                  .filter(row => row.required || (row.value ?? '').trim() !== '')
+                  .map(row => (
+                    <React.Fragment key={row.field}>
+                      <div className="font-semibold">{row.label}</div>
+                      <Editable
+                        value={row.value}
+                        onChange={v => handleUpdate(row.field as keyof CVData, v)}
+                        isExample={!modifiedFields.has(row.field)}
+                        className="break-all"
+                      />
+                    </React.Fragment>
+                  ))}
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.profile}</h2>
+              <Editable
+                value={data.summary}
+                onChange={v => handleUpdate('summary', v)}
+                isExample={!modifiedFields.has('summary')}
+                className="text-xs"
+              />
+            </section>
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.experience}</h2>
+              <div className="space-y-4">
+                {data.experiences.map(exp => (
+                  <div key={exp.id} className="space-y-1">
+                    <div className="flex justify-between gap-4">
+                      <Editable
+                        tag="h3"
+                        value={exp.role}
+                        onChange={v => updateExperience(exp.id, 'role', v)}
+                        isExample={!modifiedFields.has(`exp_${exp.id}_role`)}
+                        className="text-xs font-bold"
+                      />
+                      <Editable
+                        value={exp.period}
+                        onChange={v => updateExperience(exp.id, 'period', v)}
+                        isExample={!modifiedFields.has(`exp_${exp.id}_period`)}
+                        className="text-[10px] font-semibold text-slate-500"
+                      />
+                    </div>
+                    <Editable
+                      value={exp.company}
+                      onChange={v => updateExperience(exp.id, 'company', v)}
+                      isExample={!modifiedFields.has(`exp_${exp.id}_company`)}
+                      className="text-xs font-semibold"
+                    />
+                    <Editable
+                      value={exp.description}
+                      onChange={v => updateExperience(exp.id, 'description', v)}
+                      isExample={!modifiedFields.has(`exp_${exp.id}_description`)}
+                      className="text-xs"
+                    />
+                  </div>
+                ))}
+                {data.experiences.length === 0 && (
+                  <p className="text-slate-500 italic text-xs">{locale.ui.emptyExperience}</p>
+                )}
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.education}</h2>
+              <div className="space-y-4">
+                {data.education.map(edu => (
+                  <div key={edu.id} className="space-y-1">
+                    <div className="flex justify-between gap-4">
+                      <Editable
+                        tag="h3"
+                        value={edu.degree}
+                        onChange={v => updateEducation(edu.id, 'degree', v)}
+                        isExample={!modifiedFields.has(`edu_${edu.id}_degree`)}
+                        className="text-xs font-bold"
+                      />
+                      <Editable
+                        value={edu.year}
+                        onChange={v => updateEducation(edu.id, 'year', v)}
+                        isExample={!modifiedFields.has(`edu_${edu.id}_year`)}
+                        className="text-[10px] font-semibold text-slate-500"
+                      />
+                    </div>
+                    <Editable
+                      value={edu.school}
+                      onChange={v => updateEducation(edu.id, 'school', v)}
+                      isExample={!modifiedFields.has(`edu_${edu.id}_school`)}
+                      className="text-xs font-semibold"
+                    />
+                  </div>
+                ))}
+                {data.education.length === 0 && (
+                  <p className="text-slate-500 italic text-xs">{locale.ui.emptyEducation}</p>
+                )}
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.languageSkills}</h2>
+              <table className="w-full border border-slate-300 text-[11px]">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.language}</th>
+                    <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.comprehension}</th>
+                    <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.speaking}</th>
+                    <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.writing}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.languageSkills.map(skill => (
+                    <tr key={skill.id}>
+                      <td className="border border-slate-300 px-2 py-1">
+                        <Editable
+                          value={skill.language}
+                          onChange={v => updateLanguageSkill(skill.id, 'language', v)}
+                          isExample={!modifiedFields.has(`lang_${skill.id}_language`)}
+                        />
+                      </td>
+                      <td className="border border-slate-300 px-2 py-1">
+                        <Editable
+                          value={skill.comprehension}
+                          onChange={v => updateLanguageSkill(skill.id, 'comprehension', v)}
+                          isExample={!modifiedFields.has(`lang_${skill.id}_comprehension`)}
+                        />
+                      </td>
+                      <td className="border border-slate-300 px-2 py-1">
+                        <Editable
+                          value={skill.speaking}
+                          onChange={v => updateLanguageSkill(skill.id, 'speaking', v)}
+                          isExample={!modifiedFields.has(`lang_${skill.id}_speaking`)}
+                        />
+                      </td>
+                      <td className="border border-slate-300 px-2 py-1">
+                        <Editable
+                          value={skill.writing}
+                          onChange={v => updateLanguageSkill(skill.id, 'writing', v)}
+                          isExample={!modifiedFields.has(`lang_${skill.id}_writing`)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  {data.languageSkills.length === 0 && (
+                    <tr>
+                      <td className="border border-slate-300 px-2 py-1 text-slate-500 italic" colSpan={4}>
+                        {locale.ui.emptyLanguages}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </section>
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.digitalSkills}</h2>
+              {renderEuropassList(data.digitalSkills, 'digitalSkills', locale.ui.emptySkills)}
+            </section>
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.organizationalSkills}</h2>
+              {renderEuropassList(data.organizationalSkills, 'organizationalSkills', locale.ui.emptySoftSkills)}
+            </section>
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.professionalSkills}</h2>
+              {renderEuropassList(data.professionalSkills, 'professionalSkills', locale.ui.emptySkills)}
+            </section>
+
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.additionalInfo}</h2>
+              {renderEuropassList(data.additionalInfo, 'additionalInfo', locale.ui.emptySoftSkills)}
+            </section>
+          </div>
+        );
+      case 'blueclassic':
+      {
+        const contactRows = [
+          { id: 'email', icon: <Mail className="w-3 h-3 text-[#003399] mt-0.5 shrink-0" />, value: data.email },
+          { id: 'phone', icon: <Phone className="w-3 h-3 text-[#003399] mt-0.5 shrink-0" />, value: data.phone },
+          { id: 'location', icon: <MapPin className="w-3 h-3 text-[#003399] mt-0.5 shrink-0" />, value: data.location },
+          { id: 'portfolio', icon: <Globe className="w-3 h-3 text-[#003399] mt-0.5 shrink-0" />, value: data.portfolio }
+        ].filter(row => (row.value ?? '').trim() !== '');
+        const skills = data.skills.filter(s => s.trim() !== '');
+        const languages = data.languages.filter(l => l.trim() !== '');
+        const socials = renderSocials();
+
         return (
           <div className="flex flex-col bg-white min-h-full font-sans text-slate-800 relative">
             <header className="bg-[#003399] text-white p-8 flex items-start justify-between">
@@ -1167,73 +1760,74 @@ const App: React.FC = () => {
 
             <div className="flex flex-1">
               <aside className="w-1/3 bg-slate-50 p-8 border-r border-slate-200 space-y-10">
-                <section>
-                  <Editable
-                    tag="h3"
-                    value={data.sectionTitles.contact}
-                    onChange={v => handleTitleUpdate('contact', v)}
-                    isExample={!modifiedFields.has('title_contact')}
-                    className="text-[#003399] font-bold text-xs uppercase mb-4 border-b border-[#003399]/20 pb-1"
-                  />
-                  <div className="space-y-4 text-xs font-medium">
-                    <div className="flex items-start gap-3">
-                      <Mail className="w-3 h-3 text-[#003399] mt-0.5 shrink-0" />
-                      <Editable value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} className="break-all" />
+                {contactRows.length > 0 && (
+                  <section>
+                    <Editable
+                      tag="h3"
+                      value={data.sectionTitles.contact}
+                      onChange={v => handleTitleUpdate('contact', v)}
+                      isExample={!modifiedFields.has('title_contact')}
+                      className="text-[#003399] font-bold text-xs uppercase mb-4 border-b border-[#003399]/20 pb-1"
+                    />
+                    <div className="space-y-4 text-xs font-medium">
+                      {contactRows.map(row => (
+                        <div key={row.id} className="flex items-start gap-3">
+                          {row.icon}
+                          <Editable
+                            value={row.value}
+                            onChange={v => handleUpdate(row.id as keyof CVData, v)}
+                            isExample={!modifiedFields.has(row.id)}
+                            className="break-all"
+                          />
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex items-start gap-3">
-                      <Phone className="w-3 h-3 text-[#003399] mt-0.5 shrink-0" />
-                      <Editable value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} />
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <MapPin className="w-3 h-3 text-[#003399] mt-0.5 shrink-0" />
-                      <Editable value={data.location} onChange={v => handleUpdate('location', v)} isExample={!modifiedFields.has('location')} />
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <Globe className="w-3 h-3 text-[#003399] mt-0.5 shrink-0" />
-                      <Editable value={data.portfolio || locale.defaults.websiteLabel} onChange={v => handleUpdate('portfolio', v)} isExample={!modifiedFields.has('portfolio')} />
-                    </div>
-                  </div>
-                </section>
+                  </section>
+                )}
 
-                <section>
-                  <Editable
-                    tag="h3"
-                    value={data.sectionTitles.languages}
-                    onChange={v => handleTitleUpdate('languages', v)}
-                    isExample={!modifiedFields.has('title_languages')}
-                    className="text-[#003399] font-bold text-xs uppercase mb-4 border-b border-[#003399]/20 pb-1"
-                  />
-                  <div className="space-y-2">
-                    {data.languages.map((l, i) => (
-                      <div key={i} className="text-xs font-medium flex items-center gap-2">
-                        <CheckCircle2 className="w-3 h-3 text-green-600" />
-                        <Editable value={l} onChange={v => updateListItem('languages', i, v)} isExample={!modifiedFields.has(`languages_${i}`)} />
-                      </div>
-                    ))}
-                  </div>
-                </section>
+                {languages.length > 0 && (
+                  <section>
+                    <Editable
+                      tag="h3"
+                      value={data.sectionTitles.languages}
+                      onChange={v => handleTitleUpdate('languages', v)}
+                      isExample={!modifiedFields.has('title_languages')}
+                      className="text-[#003399] font-bold text-xs uppercase mb-4 border-b border-[#003399]/20 pb-1"
+                    />
+                    <div className="space-y-2">
+                      {languages.map((l, i) => (
+                        <div key={i} className="text-xs font-medium flex items-center gap-2">
+                          <CheckCircle2 className="w-3 h-3 text-green-600" />
+                          <Editable value={l} onChange={v => updateListItem('languages', i, v)} isExample={!modifiedFields.has(`languages_${i}`)} />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
-                <section>
-                  <Editable
-                    tag="h3"
-                    value={data.sectionTitles.skills}
-                    onChange={v => handleTitleUpdate('skills', v)}
-                    isExample={!modifiedFields.has('title_skills')}
-                    className="text-[#003399] font-bold text-xs uppercase mb-4 border-b border-[#003399]/20 pb-1"
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {data.skills.map((s, i) => (
-                      <Editable
-                        key={i}
-                        tag="span"
-                        value={s}
-                        onChange={v => updateListItem('skills', i, v)}
-                        isExample={!modifiedFields.has(`skills_${i}`)}
-                        className="bg-white border border-slate-200 px-2 py-1 rounded text-[10px] font-bold text-slate-600"
-                      />
-                    ))}
-                  </div>
-                </section>
+                {skills.length > 0 && (
+                  <section>
+                    <Editable
+                      tag="h3"
+                      value={data.sectionTitles.skills}
+                      onChange={v => handleTitleUpdate('skills', v)}
+                      isExample={!modifiedFields.has('title_skills')}
+                      className="text-[#003399] font-bold text-xs uppercase mb-4 border-b border-[#003399]/20 pb-1"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      {skills.map((s, i) => (
+                        <Editable
+                          key={i}
+                          tag="span"
+                          value={s}
+                          onChange={v => updateListItem('skills', i, v)}
+                          isExample={!modifiedFields.has(`skills_${i}`)}
+                          className="bg-white border border-slate-200 px-2 py-1 rounded text-[10px] font-bold text-slate-600"
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
               </aside>
 
               <main className="flex-1 p-8 space-y-12">
@@ -1298,11 +1892,14 @@ const App: React.FC = () => {
               </main>
             </div>
 
-            <footer className="bg-slate-50 p-6 flex justify-center border-t border-slate-200">
-              <div className="flex items-center gap-10">{renderSocials()}</div>
-            </footer>
+            {socials && (
+              <footer className="bg-slate-50 p-6 flex justify-center border-t border-slate-200">
+                <div className="flex items-center gap-10">{socials}</div>
+              </footer>
+            )}
           </div>
         );
+      }
       case 'executivepro':
         return (
           <div className="min-h-full bg-white flex flex-col font-sans text-slate-800 relative">
@@ -2259,7 +2856,7 @@ const App: React.FC = () => {
               <p className="text-slate-500 font-medium italic">Seleziona o desenho che meglio rappresenta sua carriera</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {(['executivepro', 'neoclassic', 'architectural', 'softui', 'europass', 'modern', 'classic', 'minimal', 'creative', 'corporate', 'elegant', 'tech', 'sidebar'] as CVTemplate[]).map(t => (
+              {(['executivepro', 'neoclassic', 'architectural', 'softui', 'europass', 'blueclassic', 'modern', 'classic', 'minimal', 'creative', 'corporate', 'elegant', 'tech', 'sidebar'] as CVTemplate[]).map(t => (
                 <button 
                   key={t}
                   onClick={() => {
@@ -2272,7 +2869,7 @@ const App: React.FC = () => {
                     <TemplateDrawing type={t} />
                   </div>
                   <div className="bg-white p-3 border-t border-slate-100 flex items-center justify-between">
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${data.template === t ? 'text-blue-600' : 'text-slate-500'}`}>{t}</span>
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${data.template === t ? 'text-blue-600' : 'text-slate-500'}`}>{getTemplateLabel(t)}</span>
                     {data.template === t && <CheckCircle2 className="w-3 h-3 text-blue-500" />}
                   </div>
                   <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/5 transition-colors pointer-events-none" />
@@ -2308,7 +2905,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="text-left">
                   <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Visualizza Disegni</p>
-                  <p className="text-sm font-black uppercase tracking-tight text-white">{data.template}</p>
+                  <p className="text-sm font-black uppercase tracking-tight text-white">{getTemplateLabel(data.template)}</p>
                 </div>
               </div>
               <Maximize2 className="w-5 h-5 text-slate-500 group-hover:text-blue-400" />
@@ -2380,26 +2977,29 @@ const App: React.FC = () => {
           <section className="space-y-3">
             <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">{data.sectionTitles.social}</h3>
             <div className="space-y-2">
-               <div className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
-                  <Github className="w-4 h-4 text-slate-500" />
-                  <input className="bg-transparent border-none text-sm w-full outline-none text-white" value={data.github} onChange={e => handleUpdate('github', e.target.value)} placeholder="Github URL" />
-               </div>
-               <div className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
-                  <Linkedin className="w-4 h-4 text-slate-500" />
-                  <input className="bg-transparent border-none text-sm w-full outline-none text-white" value={data.linkedin} onChange={e => handleUpdate('linkedin', e.target.value)} placeholder="Linkedin URL" />
-               </div>
-               <div className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
-                  <ExternalLink className="w-4 h-4 text-slate-500" />
-                  <input className="bg-transparent border-none text-sm w-full outline-none text-white" value={data.portfolio} onChange={e => handleUpdate('portfolio', e.target.value)} placeholder="Portfolio URL" />
-               </div>
-               <div className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
-                  <Instagram className="w-4 h-4 text-slate-500" />
-                  <input className="bg-transparent border-none text-sm w-full outline-none text-white" value={data.instagram} onChange={e => handleUpdate('instagram', e.target.value)} placeholder="Instagram Handle" />
-               </div>
-               <div className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
-                  <Twitter className="w-4 h-4 text-slate-500" />
-                  <input className="bg-transparent border-none text-sm w-full outline-none text-white" value={data.twitter} onChange={e => handleUpdate('twitter', e.target.value)} placeholder="Twitter/X Handle" />
-               </div>
+              {(isEuropass
+                ? [
+                    { id: 'linkedin', icon: <Linkedin className="w-4 h-4 text-slate-500" />, placeholder: "Linkedin URL" },
+                    { id: 'portfolio', icon: <ExternalLink className="w-4 h-4 text-slate-500" />, placeholder: "Portfolio URL" }
+                  ]
+                : [
+                    { id: 'github', icon: <Github className="w-4 h-4 text-slate-500" />, placeholder: "Github URL" },
+                    { id: 'linkedin', icon: <Linkedin className="w-4 h-4 text-slate-500" />, placeholder: "Linkedin URL" },
+                    { id: 'portfolio', icon: <ExternalLink className="w-4 h-4 text-slate-500" />, placeholder: "Portfolio URL" },
+                    { id: 'instagram', icon: <Instagram className="w-4 h-4 text-slate-500" />, placeholder: "Instagram Handle" },
+                    { id: 'twitter', icon: <Twitter className="w-4 h-4 text-slate-500" />, placeholder: "Twitter/X Handle" }
+                  ]
+              ).map(item => (
+                <div key={item.id} className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
+                  {item.icon}
+                  <input
+                    className="bg-transparent border-none text-sm w-full outline-none text-white"
+                    value={data[item.id as keyof CVData] as string}
+                    onChange={e => handleUpdate(item.id as keyof CVData, e.target.value)}
+                    placeholder={item.placeholder}
+                  />
+                </div>
+              ))}
             </div>
           </section>
 
@@ -2431,33 +3031,64 @@ const App: React.FC = () => {
             ))}
           </section>
 
-          {[
-            { title: data.sectionTitles.skills, field: 'skills' },
-            { title: data.sectionTitles.languages, field: 'languages' },
-            { title: data.sectionTitles.softSkills, field: 'softSkills' }
-          ].map(list => (
-            <section key={list.field} className="space-y-3">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">
-                  {list.title}
-                </h3>
-                <button onClick={() => addListItem(list.field as any)} className="text-blue-400"><Plus className="w-4 h-4" /></button>
-              </div>
-              <div className="space-y-2">
-                {data[list.field as keyof CVData] instanceof Array && (data[list.field as keyof CVData] as string[]).map((item, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <input 
-                      className="flex-1 bg-slate-800 border-none rounded-lg p-2 text-sm text-white"
-                      value={item}
-                      onChange={e => updateListItem(list.field as any, idx, e.target.value)}
-                      placeholder={`Nuovo item...`}
-                    />
-                    <button onClick={() => removeListItem(list.field as any, idx)} className="text-slate-600 hover:text-red-400 transition"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
+          {isEuropass ? (
+            <>
+              <section className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">
+                    {locale.europass.languageSkills} (A1-C2)
+                  </h3>
+                  <button onClick={addLanguageSkill} className="text-blue-400"><Plus className="w-4 h-4" /></button>
+                </div>
+                <div className="space-y-2">
+                  {data.languageSkills.map(skill => (
+                    <div key={skill.id} className="grid grid-cols-[1.2fr_.8fr_.8fr_.8fr_auto] gap-2 items-center">
+                      <input
+                        className="bg-slate-800 border-none rounded-lg p-2 text-sm text-white"
+                        value={skill.language}
+                        onChange={e => updateLanguageSkill(skill.id, 'language', e.target.value)}
+                        placeholder="Lingua"
+                      />
+                      <input
+                        className="bg-slate-800 border-none rounded-lg p-2 text-sm text-white"
+                        value={skill.comprehension}
+                        onChange={e => updateLanguageSkill(skill.id, 'comprehension', e.target.value)}
+                        placeholder="B1"
+                      />
+                      <input
+                        className="bg-slate-800 border-none rounded-lg p-2 text-sm text-white"
+                        value={skill.speaking}
+                        onChange={e => updateLanguageSkill(skill.id, 'speaking', e.target.value)}
+                        placeholder="B1"
+                      />
+                      <input
+                        className="bg-slate-800 border-none rounded-lg p-2 text-sm text-white"
+                        value={skill.writing}
+                        onChange={e => updateLanguageSkill(skill.id, 'writing', e.target.value)}
+                        placeholder="B1"
+                      />
+                      <button onClick={() => removeLanguageSkill(skill.id)} className="text-slate-600 hover:text-red-400 transition">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {[
+                { title: locale.europass.digitalSkills, field: 'digitalSkills' },
+                { title: locale.europass.organizationalSkills, field: 'organizationalSkills' },
+                { title: locale.europass.professionalSkills, field: 'professionalSkills' },
+                { title: locale.europass.additionalInfo, field: 'additionalInfo' }
+              ].map(list => renderListEditor(list.title, list.field as any))}
+            </>
+          ) : (
+            [
+              { title: data.sectionTitles.skills, field: 'skills' },
+              { title: data.sectionTitles.languages, field: 'languages' },
+              { title: data.sectionTitles.softSkills, field: 'softSkills' }
+            ].map(list => renderListEditor(list.title, list.field as any))
+          )}
 
           <button onClick={handleDownloadPDF} disabled={isGeneratingPDF} className="w-full bg-blue-600 hover:bg-blue-700 p-4 rounded-xl font-bold flex items-center justify-center gap-3 transition shadow-xl shadow-blue-900/20">
             {isGeneratingPDF ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" /> : <><FileText className="w-5 h-5" /> SCARICA PDF</>}
@@ -2500,7 +3131,8 @@ const App: React.FC = () => {
           <div 
             ref={cvRef} 
             id="cv-download-container" 
-            className="w-full max-w-[210mm] md:w-[210mm] shadow-2xl min-h-[297mm] flex flex-col overflow-hidden bg-white"
+            className="w-full max-w-[210mm] md:w-[210mm] shadow-2xl min-h-[297mm] flex flex-col overflow-hidden bg-white notranslate"
+            translate="no"
             style={isGeneratingPDF ? { width: '210mm', maxWidth: '210mm' } : undefined}
           >
             {renderTemplate()}

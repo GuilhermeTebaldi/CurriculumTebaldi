@@ -118,6 +118,11 @@ const LOCALES: Record<Language, {
     language: string;
     save: string;
     saved: string;
+    clear: string;
+    clearTitle: string;
+    clearMessage: string;
+    clearConfirm: string;
+    clearCancel: string;
     clickToEdit: string;
     addTab: string;
     removeTab: string;
@@ -222,6 +227,11 @@ const LOCALES: Record<Language, {
       language: "Lingua",
       save: "Salva nel browser",
       saved: "Salvato",
+      clear: "Ripristina",
+      clearTitle: "Ripristinare i dati?",
+      clearMessage: "Questo cancellerà il salvataggio nel browser e ripristinerà il modello iniziale.",
+      clearConfirm: "Sì, ripristina",
+      clearCancel: "Annulla",
       clickToEdit: "CLICCA DIRETTAMENTE SULLA CARTA PER MODIFICARE",
       addTab: "Aggiungi",
       removeTab: "Rimuovi",
@@ -326,6 +336,11 @@ const LOCALES: Record<Language, {
       language: "Idioma",
       save: "Salvar no navegador",
       saved: "Salvo",
+      clear: "Restaurar",
+      clearTitle: "Restaurar dados?",
+      clearMessage: "Isso apagará o salvamento no navegador e voltará ao modelo inicial.",
+      clearConfirm: "Sim, restaurar",
+      clearCancel: "Cancelar",
       clickToEdit: "CLIQUE DIRETAMENTE NO CURRÍCULO PARA EDITAR",
       addTab: "Adicionar",
       removeTab: "Apagar",
@@ -430,6 +445,11 @@ const LOCALES: Record<Language, {
       language: "Language",
       save: "Save in browser",
       saved: "Saved",
+      clear: "Reset",
+      clearTitle: "Reset data?",
+      clearMessage: "This will clear the browser save and restore the initial template.",
+      clearConfirm: "Yes, reset",
+      clearCancel: "Cancel",
       clickToEdit: "CLICK DIRECTLY ON THE CV TO EDIT",
       addTab: "Add",
       removeTab: "Remove",
@@ -534,6 +554,11 @@ const LOCALES: Record<Language, {
       language: "Idioma",
       save: "Guardar en el navegador",
       saved: "Guardado",
+      clear: "Restablecer",
+      clearTitle: "¿Restablecer datos?",
+      clearMessage: "Esto borrará el guardado del navegador y restaurará el modelo inicial.",
+      clearConfirm: "Sí, restablecer",
+      clearCancel: "Cancelar",
       clickToEdit: "HAZ CLIC DIRECTAMENTE EN EL CV PARA EDITAR",
       addTab: "Agregar",
       removeTab: "Eliminar",
@@ -593,7 +618,7 @@ const INITIAL_DATA: CVData = {
       year: "2011"
     }
   ],
-  skills: ["React", "Java", "C#", "Render", "Vercel", "Social Media Management", "Digital Marketing"],
+  skills: ["React", "Java", "C#", "Render", "Vercel", "Social Media ", "Digital Marketing"],
   languages: ["Portoghese (Madrelingua)", "Italiano"],
   softSkills: ["Problem Solving", "Focus Profondo", "Creatività", "Adattabilità"],
   languageSkills: DEFAULT_LANGUAGE_SKILLS,
@@ -652,7 +677,18 @@ const Editable: React.FC<{
   className?: string;
   tag?: keyof React.JSX.IntrinsicElements;
   isExample?: boolean;
-}> = ({ value, onChange, className, tag: Tag = 'div' as any, isExample }) => {
+  clearable?: boolean;
+}> = ({ value, onChange, className, tag: Tag = 'div' as any, isExample, clearable = true }) => {
+  const elRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+    if (document.activeElement === el) return;
+    if (el.innerText !== value) {
+      el.innerText = value;
+    }
+  }, [value]);
   const handleFocus = (e: React.FocusEvent<HTMLElement>) => {
     if (isExample) {
       e.currentTarget.innerText = '';
@@ -670,16 +706,40 @@ const Editable: React.FC<{
     onChange(newVal);
   };
 
+  const showClear = clearable;
+
   return (
-    <Tag
-      contentEditable
-      suppressContentEditableWarning
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      className={`hover:bg-blue-50/50 hover:outline-dashed hover:outline-1 hover:outline-blue-400 transition-all cursor-text focus:outline-blue-500 focus:bg-blue-50/80 outline-none ${className}`}
-    >
-      {value}
-    </Tag>
+    <div className="relative group">
+      <Tag
+        ref={elRef as any}
+        contentEditable
+        suppressContentEditableWarning
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        className={`hover:bg-blue-50/50 hover:outline-dashed hover:outline-1 hover:outline-blue-400 transition-all cursor-text focus:outline-blue-500 focus:bg-blue-50/80 outline-none ${className}`}
+      >
+        {value}
+      </Tag>
+      {showClear && (
+        <button
+          type="button"
+          contentEditable={false}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (elRef.current) {
+              elRef.current.innerText = '';
+              elRef.current.blur();
+            }
+            onChange('');
+          }}
+          className="no-print no-pdf absolute -right-2 -top-2 opacity-100 bg-white text-slate-500 hover:text-red-500 border border-slate-200 rounded-full p-1 shadow-sm"
+          title="Limpar"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -983,14 +1043,68 @@ const App: React.FC = () => {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [language, setLanguage] = useState<Language>('it');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [undoStack, setUndoStack] = useState<Array<{ data: CVData; modifiedFields: string[]; language: Language }>>([]);
+  const [redoStack, setRedoStack] = useState<Array<{ data: CVData; modifiedFields: string[]; language: Language }>>([]);
+  const isHistoryActionRef = useRef(false);
+  const lastSnapshotRef = useRef<string>('');
   const isGeneratingPDFRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
 
   const locale = LOCALES[language];
   const isEuropass = data.template === 'europass';
+
+  const pushHistorySnapshot = (nextData: CVData, nextModified: Set<string>, nextLanguage: Language) => {
+    const snapshotKey = JSON.stringify({
+      data: nextData,
+      modifiedFields: Array.from(nextModified),
+      language: nextLanguage
+    });
+    if (snapshotKey === lastSnapshotRef.current) return;
+    lastSnapshotRef.current = snapshotKey;
+    setUndoStack(prev => {
+      const next = [...prev, { data: nextData, modifiedFields: Array.from(nextModified), language: nextLanguage }];
+      // keep last 50
+      return next.length > 50 ? next.slice(next.length - 50) : next;
+    });
+    setRedoStack([]);
+  };
+
+  const applySnapshot = (snap: { data: CVData; modifiedFields: string[]; language: Language }) => {
+    isHistoryActionRef.current = true;
+    setData(snap.data);
+    setModifiedFields(new Set(snap.modifiedFields));
+    setLanguage(snap.language);
+    window.setTimeout(() => {
+      isHistoryActionRef.current = false;
+    }, 0);
+  };
+
+  const handleUndo = () => {
+    setUndoStack(prev => {
+      if (prev.length <= 1) return prev;
+      const next = [...prev];
+      const current = next.pop()!;
+      const previous = next[next.length - 1];
+      setRedoStack(r => [...r, current]);
+      applySnapshot(previous);
+      return next;
+    });
+  };
+
+  const handleRedo = () => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const next = [...prev];
+      const snap = next.pop()!;
+      setUndoStack(u => [...u, snap]);
+      applySnapshot(snap);
+      return next;
+    });
+  };
 
   useEffect(() => {
     try {
@@ -1013,6 +1127,28 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (isHistoryActionRef.current) return;
+    pushHistorySnapshot(data, modifiedFields, language);
+  }, [data, modifiedFields, language]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod) return;
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if (e.key.toLowerCase() === 'z' && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
     isGeneratingPDFRef.current = isGeneratingPDF;
   }, [isGeneratingPDF]);
 
@@ -1020,7 +1156,6 @@ const App: React.FC = () => {
     const handler = (event: ErrorEvent) => {
       const error = event.error as any;
       if (
-        isGeneratingPDFRef.current &&
         error &&
         (error.name === 'NotFoundError' || error instanceof DOMException) &&
         /removeChild/i.test(event.message)
@@ -1034,7 +1169,6 @@ const App: React.FC = () => {
       const reason = event.reason as any;
       const message = typeof reason?.message === 'string' ? reason.message : '';
       if (
-        isGeneratingPDFRef.current &&
         (reason?.name === 'NotFoundError' || reason instanceof DOMException) &&
         /removeChild/i.test(message)
       ) {
@@ -1050,7 +1184,6 @@ const App: React.FC = () => {
         return originalRemoveChild.call(this, child);
       } catch (err: any) {
         if (
-          isGeneratingPDFRef.current &&
           (err?.name === 'NotFoundError' || err instanceof DOMException)
         ) {
           return child;
@@ -1187,11 +1320,11 @@ const App: React.FC = () => {
         <button onClick={() => addListItem(field)} className="text-blue-400"><Plus className="w-4 h-4" /></button>
       </div>
       <div className="space-y-2">
-        {data[field].map((item, idx) => (
+        {(data[field] as string[]).map((value, idx) => (
           <div key={idx} className="flex gap-2">
             <input 
               className="flex-1 bg-slate-800 border-none rounded-lg p-2 text-sm text-white"
-              value={item}
+              value={value}
               onChange={e => updateListItem(field, idx, e.target.value)}
               placeholder={`Nuovo item...`}
             />
@@ -1321,15 +1454,32 @@ const App: React.FC = () => {
     }
   };
 
+  const handleClearSaved = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (err) {
+      console.error("Clear Error:", err);
+    }
+    setData(INITIAL_DATA);
+    setModifiedFields(new Set());
+    setLanguage('it');
+    setSaveStatus('idle');
+    setUndoStack([]);
+    setRedoStack([]);
+    lastSnapshotRef.current = '';
+  };
+
   const handleDownloadPDF = () => {
     if (!cvRef.current) return;
     setIsGeneratingPDF(true);
     isGeneratingPDFRef.current = true;
+    document.body.classList.add('pdf-mode');
     requestAnimationFrame(() => {
       const element = cvRef.current;
       if (!element) {
         setIsGeneratingPDF(false);
         isGeneratingPDFRef.current = false;
+        document.body.classList.remove('pdf-mode');
         return;
       }
 
@@ -1391,6 +1541,7 @@ const App: React.FC = () => {
             }
           });
         setIsGeneratingPDF(false);
+        document.body.classList.remove('pdf-mode');
         window.setTimeout(() => {
           isGeneratingPDFRef.current = false;
         }, 3000);
@@ -1464,6 +1615,43 @@ const App: React.FC = () => {
       </div>
     );
   };
+
+  const hasText = (value: string | undefined | null) => (value ?? '').trim() !== '';
+  const indexedSkills = data.skills
+    .map((value, idx) => ({ value, idx }))
+    .filter(item => hasText(item.value));
+  const indexedLanguages = data.languages
+    .map((value, idx) => ({ value, idx }))
+    .filter(item => hasText(item.value));
+  const indexedSoftSkills = data.softSkills
+    .map((value, idx) => ({ value, idx }))
+    .filter(item => hasText(item.value));
+  const filteredExperiences = data.experiences.filter(exp =>
+    [exp.company, exp.role, exp.period, exp.description].some(hasText)
+  );
+  const filteredEducation = data.education.filter(edu =>
+    [edu.school, edu.degree, edu.year].some(hasText)
+  );
+  const filteredLanguageSkills = data.languageSkills.filter(skill =>
+    [skill.language, skill.comprehension, skill.speaking, skill.writing].some(hasText)
+  );
+  const curriculoguiSocialItems = (isEuropass
+    ? [
+        { id: 'linkedin', icon: <Linkedin className="w-4 h-4 text-slate-500" />, placeholder: "Linkedin URL" },
+        { id: 'portfolio', icon: <ExternalLink className="w-4 h-4 text-slate-500" />, placeholder: "Portfolio URL" }
+      ]
+    : [
+        { id: 'github', icon: <Github className="w-4 h-4 text-slate-500" />, placeholder: "Github URL" },
+        { id: 'linkedin', icon: <Linkedin className="w-4 h-4 text-slate-500" />, placeholder: "Linkedin URL" },
+        { id: 'portfolio', icon: <ExternalLink className="w-4 h-4 text-slate-500" />, placeholder: "Portfolio URL" },
+        { id: 'instagram', icon: <Instagram className="w-4 h-4 text-slate-500" />, placeholder: "Instagram Handle" },
+        { id: 'twitter', icon: <Twitter className="w-4 h-4 text-slate-500" />, placeholder: "Twitter/X Handle" }
+      ]
+  );
+  const curriculoguiContactItems = [
+    { id: 'email', icon: <Mail className="w-4 h-4 text-slate-500" /> },
+    { id: 'phone', icon: <Phone className="w-4 h-4 text-slate-500" /> }
+  ];
 
   const renderTemplate = () => {
     const nameParts = data.fullName.split(' ');
@@ -1567,7 +1755,7 @@ const App: React.FC = () => {
             <section className="space-y-2">
               <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.experience}</h2>
               <div className="space-y-4">
-                {data.experiences.map(exp => (
+                {filteredExperiences.map(exp => (
                   <div key={exp.id} className="space-y-1">
                     <div className="flex justify-between gap-4">
                       <Editable
@@ -1607,7 +1795,7 @@ const App: React.FC = () => {
             <section className="space-y-2">
               <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.education}</h2>
               <div className="space-y-4">
-                {data.education.map(edu => (
+                {filteredEducation.map(edu => (
                   <div key={edu.id} className="space-y-1">
                     <div className="flex justify-between gap-4">
                       <Editable
@@ -1650,7 +1838,7 @@ const App: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.languageSkills.map(skill => (
+                  {filteredLanguageSkills.map(skill => (
                     <tr key={skill.id}>
                       <td className="border border-slate-300 px-2 py-1">
                         <Editable
@@ -1765,7 +1953,7 @@ const App: React.FC = () => {
                     <Editable
                       tag="h3"
                       value={data.sectionTitles.contact}
-                      onChange={v => handleTitleUpdate('contact', v)}
+                      onChange={v => handleTitleUpdate('contact', v)} clearable={false}
                       isExample={!modifiedFields.has('title_contact')}
                       className="text-[#003399] font-bold text-xs uppercase mb-4 border-b border-[#003399]/20 pb-1"
                     />
@@ -1790,7 +1978,7 @@ const App: React.FC = () => {
                     <Editable
                       tag="h3"
                       value={data.sectionTitles.languages}
-                      onChange={v => handleTitleUpdate('languages', v)}
+                      onChange={v => handleTitleUpdate('languages', v)} clearable={false}
                       isExample={!modifiedFields.has('title_languages')}
                       className="text-[#003399] font-bold text-xs uppercase mb-4 border-b border-[#003399]/20 pb-1"
                     />
@@ -1810,7 +1998,7 @@ const App: React.FC = () => {
                     <Editable
                       tag="h3"
                       value={data.sectionTitles.skills}
-                      onChange={v => handleTitleUpdate('skills', v)}
+                      onChange={v => handleTitleUpdate('skills', v)} clearable={false}
                       isExample={!modifiedFields.has('title_skills')}
                       className="text-[#003399] font-bold text-xs uppercase mb-4 border-b border-[#003399]/20 pb-1"
                     />
@@ -1835,7 +2023,7 @@ const App: React.FC = () => {
                   <Editable
                     tag="h3"
                     value={data.sectionTitles.summary}
-                    onChange={v => handleTitleUpdate('summary', v)}
+                    onChange={v => handleTitleUpdate('summary', v)} clearable={false}
                     isExample={!modifiedFields.has('title_summary')}
                     className="text-[#003399] font-black text-xs uppercase mb-4 border-l-4 border-[#003399] pl-3"
                   />
@@ -1851,12 +2039,12 @@ const App: React.FC = () => {
                   <Editable
                     tag="h3"
                     value={data.sectionTitles.experience}
-                    onChange={v => handleTitleUpdate('experience', v)}
+                    onChange={v => handleTitleUpdate('experience', v)} clearable={false}
                     isExample={!modifiedFields.has('title_experience')}
                     className="text-[#003399] font-black text-xs uppercase mb-4 border-l-4 border-[#003399] pl-3"
                   />
                   <div className="space-y-8">
-                    {data.experiences.map(exp => (
+                    {filteredExperiences.map(exp => (
                       <div key={exp.id} className="relative">
                         <div className="flex justify-between items-baseline mb-1">
                           <Editable tag="h4" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} isExample={!modifiedFields.has(`exp_${exp.id}_role`)} className="text-sm font-bold text-slate-800" />
@@ -1873,12 +2061,12 @@ const App: React.FC = () => {
                   <Editable
                     tag="h3"
                     value={data.sectionTitles.education}
-                    onChange={v => handleTitleUpdate('education', v)}
+                    onChange={v => handleTitleUpdate('education', v)} clearable={false}
                     isExample={!modifiedFields.has('title_education')}
                     className="text-[#003399] font-black text-xs uppercase mb-4 border-l-4 border-[#003399] pl-3"
                   />
                   <div className="space-y-6">
-                    {data.education.map(edu => (
+                    {filteredEducation.map(edu => (
                       <div key={edu.id}>
                         <div className="flex justify-between items-baseline mb-1">
                           <Editable tag="h4" value={edu.degree} onChange={v => updateEducation(edu.id, 'degree', v)} isExample={!modifiedFields.has(`edu_${edu.id}_degree`)} className="text-sm font-bold text-slate-800" />
@@ -1922,36 +2110,42 @@ const App: React.FC = () => {
             <div className="flex-1 flex">
               <aside className="w-1/3 bg-slate-50 p-10 border-r border-slate-200 space-y-12">
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.contact} onChange={v => handleTitleUpdate('contact', v)} isExample={!modifiedFields.has('title_contact')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6" />
+                  <Editable tag="h2" value={data.sectionTitles.contact} onChange={v => handleTitleUpdate('contact', v)} clearable={false} isExample={!modifiedFields.has('title_contact')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6" />
                   <div className="space-y-4 text-xs font-bold text-slate-600">
-                    <div className="flex items-center gap-3">
-                      <Mail size={14} className="text-blue-500" />
-                      <Editable value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} />
+                    <div className="flex items-start gap-3 min-w-0">
+                      <Mail size={14} className="text-blue-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <Editable value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} className="break-all leading-snug" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Phone size={14} className="text-blue-500" />
-                      <Editable value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} />
+                    <div className="flex items-start gap-3 min-w-0">
+                      <Phone size={14} className="text-blue-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <Editable value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} className="break-all leading-snug" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <MapPin size={14} className="text-blue-500" />
-                      <Editable value={data.location} onChange={v => handleUpdate('location', v)} isExample={!modifiedFields.has('location')} />
+                    <div className="flex items-start gap-3 min-w-0">
+                      <MapPin size={14} className="text-blue-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <Editable value={data.location} onChange={v => handleUpdate('location', v)} isExample={!modifiedFields.has('location')} className="break-all leading-snug" />
+                      </div>
                     </div>
                   </div>
                 </section>
 
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} isExample={!modifiedFields.has('title_skills')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6" />
+                  <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} isExample={!modifiedFields.has('title_skills')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6" />
                   <div className="flex flex-wrap gap-2">
-                    {data.skills.map((s, i) => (
+                    {indexedSkills.map(({ value: s, idx: i }) => (
                       <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} isExample={!modifiedFields.has(`skills_${i}`)} className="bg-white border border-slate-200 px-3 py-1.5 rounded-md text-[10px] font-black text-slate-700 shadow-sm" />
                     ))}
                   </div>
                 </section>
 
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} isExample={!modifiedFields.has('title_languages')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6" />
+                  <Editable tag="h2" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} clearable={false} isExample={!modifiedFields.has('title_languages')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6" />
                   <div className="space-y-3">
-                    {data.languages.map((l, i) => (
+                    {indexedLanguages.map(({ value: l, idx: i }) => (
                       <div key={i} className="text-xs font-bold text-slate-700 flex justify-between items-center">
                         <Editable value={l} onChange={v => updateListItem('languages', i, v)} isExample={!modifiedFields.has(`languages_${i}`)} />
                         <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
@@ -1965,7 +2159,7 @@ const App: React.FC = () => {
                   <Editable
                     tag="h2"
                     value={data.sectionTitles.social}
-                    onChange={v => handleTitleUpdate('social', v)}
+                    onChange={v => handleTitleUpdate('social', v)} clearable={false}
                     isExample={!modifiedFields.has('title_social')}
                     className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6"
                   />
@@ -1981,15 +2175,15 @@ const App: React.FC = () => {
 
               <main className="flex-1 p-12 space-y-12">
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} isExample={!modifiedFields.has('title_summary')} className="text-lg font-black uppercase text-slate-900 mb-4" />
+                  <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} clearable={false} isExample={!modifiedFields.has('title_summary')} className="text-lg font-black uppercase text-slate-900 mb-4" />
                   <div className="w-10 h-1 bg-blue-500 mb-6" />
                   <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-sm leading-relaxed text-slate-600 italic" />
                 </section>
 
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} isExample={!modifiedFields.has('title_experience')} className="text-lg font-black uppercase text-slate-900 mb-8" />
+                  <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} isExample={!modifiedFields.has('title_experience')} className="text-lg font-black uppercase text-slate-900 mb-8" />
                   <div className="space-y-10">
-                    {data.experiences.map(exp => (
+                    {filteredExperiences.map(exp => (
                       <div key={exp.id}>
                         <div className="flex justify-between items-baseline mb-2">
                           <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} isExample={!modifiedFields.has(`exp_${exp.id}_role`)} className="text-base font-black text-slate-900" />
@@ -2023,14 +2217,14 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-12 gap-10 flex-1">
                   <div className="col-span-8 space-y-12">
                     <section>
-                      <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} isExample={!modifiedFields.has('title_summary')} className="text-xs font-black uppercase tracking-[0.4em] mb-8 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
+                      <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} clearable={false} isExample={!modifiedFields.has('title_summary')} className="text-xs font-black uppercase tracking-[0.4em] mb-8 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
                       <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-base leading-relaxed text-[#333] text-justify italic" />
                     </section>
 
                     <section>
-                      <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} isExample={!modifiedFields.has('title_experience')} className="text-xs font-black uppercase tracking-[0.4em] mb-8 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
+                      <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} isExample={!modifiedFields.has('title_experience')} className="text-xs font-black uppercase tracking-[0.4em] mb-8 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
                       <div className="space-y-8">
-                        {data.experiences.map(exp => (
+                        {filteredExperiences.map(exp => (
                           <div key={exp.id} className="relative">
                             <div className="flex justify-between items-baseline mb-3">
                               <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} isExample={!modifiedFields.has(`exp_${exp.id}_role`)} className="text-xl font-normal italic" />
@@ -2046,9 +2240,9 @@ const App: React.FC = () => {
 
                   <div className="col-span-4 space-y-12">
                     <section>
-                      <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} isExample={!modifiedFields.has('title_skills')} className="text-xs font-black uppercase tracking-[0.4em] mb-6 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
+                      <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} isExample={!modifiedFields.has('title_skills')} className="text-xs font-black uppercase tracking-[0.4em] mb-6 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
                       <div className="space-y-3">
-                        {data.skills.map((s, i) => (
+                        {indexedSkills.map(({ value: s, idx: i }) => (
                           <div key={i} className="text-xs font-bold uppercase tracking-widest text-[#555] flex items-center gap-3">
                             <div className="w-1 h-1 bg-[#d4af37]" />
                             <Editable value={s} onChange={v => updateListItem('skills', i, v)} isExample={!modifiedFields.has(`skills_${i}`)} />
@@ -2058,9 +2252,9 @@ const App: React.FC = () => {
                     </section>
 
                     <section>
-                      <Editable tag="h2" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} isExample={!modifiedFields.has('title_languages')} className="text-xs font-black uppercase tracking-[0.4em] mb-6 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
+                      <Editable tag="h2" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} clearable={false} isExample={!modifiedFields.has('title_languages')} className="text-xs font-black uppercase tracking-[0.4em] mb-6 text-[#8b0000] border-b border-[#d4af37]/30 pb-2" />
                       <div className="space-y-4">
-                        {data.languages.map((l, i) => (
+                        {indexedLanguages.map(({ value: l, idx: i }) => (
                           <div key={i} className="text-xs font-normal text-[#555] italic">
                             <Editable value={l} onChange={v => updateListItem('languages', i, v)} isExample={!modifiedFields.has(`languages_${i}`)} />
                           </div>
@@ -2072,7 +2266,7 @@ const App: React.FC = () => {
                       <Editable
                         tag="h2"
                         value={data.sectionTitles.social}
-                        onChange={v => handleTitleUpdate('social', v)}
+                        onChange={v => handleTitleUpdate('social', v)} clearable={false}
                         isExample={!modifiedFields.has('title_social')}
                         className="text-xs font-black uppercase tracking-[0.4em] mb-6 text-[#8b0000] border-b border-[#d4af37]/30 pb-2"
                       />
@@ -2115,7 +2309,7 @@ const App: React.FC = () => {
                 <div className="space-y-24">
                   <section className="grid grid-cols-3 gap-12">
                     <div className="col-span-1">
-                      <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} isExample={!modifiedFields.has('title_summary')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
+                      <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} clearable={false} isExample={!modifiedFields.has('title_summary')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
                       <div className="h-1 w-8 bg-blue-600" />
                     </div>
                     <div className="col-span-2">
@@ -2125,11 +2319,11 @@ const App: React.FC = () => {
 
                   <section className="grid grid-cols-3 gap-12">
                     <div className="col-span-1">
-                      <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} isExample={!modifiedFields.has('title_experience')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
+                      <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} isExample={!modifiedFields.has('title_experience')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
                       <div className="h-1 w-8 bg-blue-600" />
                     </div>
                     <div className="col-span-2 space-y-12">
-                      {data.experiences.map(exp => (
+                      {filteredExperiences.map(exp => (
                         <div key={exp.id} className="group">
                           <div className="flex justify-between items-baseline mb-4">
                             <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} isExample={!modifiedFields.has(`exp_${exp.id}_role`)} className="text-2xl font-black uppercase tracking-tight" />
@@ -2144,11 +2338,11 @@ const App: React.FC = () => {
 
                   <section className="grid grid-cols-3 gap-12">
                     <div className="col-span-1">
-                      <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} isExample={!modifiedFields.has('title_skills')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
+                      <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} isExample={!modifiedFields.has('title_skills')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
                       <div className="h-1 w-8 bg-blue-600" />
                     </div>
                     <div className="col-span-2 grid grid-cols-2 gap-x-12 gap-y-6">
-                      {data.skills.map((s, i) => (
+                      {indexedSkills.map(({ value: s, idx: i }) => (
                         <div key={i} className="border-b border-slate-100 pb-2">
                           <Editable value={s} onChange={v => updateListItem('skills', i, v)} isExample={!modifiedFields.has(`skills_${i}`)} className="text-xs font-black uppercase tracking-widest text-slate-800" />
                         </div>
@@ -2158,7 +2352,7 @@ const App: React.FC = () => {
 
                   <section className="grid grid-cols-3 gap-12">
                     <div className="col-span-1">
-                      <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} isExample={!modifiedFields.has('title_social')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
+                      <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} clearable={false} isExample={!modifiedFields.has('title_social')} className="text-xs font-black uppercase tracking-[0.4em] text-slate-300 mb-2" />
                       <div className="h-1 w-8 bg-blue-600" />
                     </div>
                     <div className="col-span-2">
@@ -2207,15 +2401,15 @@ const App: React.FC = () => {
                   <section className="bg-slate-50/50 p-8 rounded-[32px] border border-white">
                     <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-6 flex items-center gap-2">
                       <Sparkle size={12} className="text-blue-500" /> 
-                      <Editable tag="span" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} isExample={!modifiedFields.has('title_summary')} />
+                      <Editable tag="span" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} clearable={false} isExample={!modifiedFields.has('title_summary')} />
                     </h2>
                     <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-sm leading-relaxed text-slate-500" />
                   </section>
 
                   <section className="px-4">
-                    <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} isExample={!modifiedFields.has('title_experience')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-8" />
+                    <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} isExample={!modifiedFields.has('title_experience')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-8" />
                     <div className="space-y-8">
-                      {data.experiences.map(exp => (
+                      {filteredExperiences.map(exp => (
                         <div key={exp.id} className="relative pl-10 border-l-4 border-slate-50">
                           <div className="absolute left-[-10px] top-1.5 w-4 h-4 rounded-full bg-white shadow-md border-4 border-blue-500" />
                           <div className="flex justify-between items-start mb-2">
@@ -2232,9 +2426,9 @@ const App: React.FC = () => {
 
                 <div className="col-span-5 space-y-12">
                   <section className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-50">
-                    <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} isExample={!modifiedFields.has('title_skills')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-6" />
+                    <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} isExample={!modifiedFields.has('title_skills')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-6" />
                     <div className="flex flex-wrap gap-3">
-                      {data.skills.map((s, i) => (
+                      {indexedSkills.map(({ value: s, idx: i }) => (
                         <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} isExample={!modifiedFields.has(`skills_${i}`)} className="px-4 py-2 bg-slate-50 rounded-2xl text-[10px] font-bold text-slate-600 shadow-sm border border-white" />
                       ))}
                     </div>
@@ -2265,7 +2459,7 @@ const App: React.FC = () => {
                   </section>
 
                   <section className="px-4">
-                    <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} isExample={!modifiedFields.has('title_social')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-4" />
+                    <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} clearable={false} isExample={!modifiedFields.has('title_social')} className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 mb-4" />
                     <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500 leading-tight">
                       {renderSocials(false, {
                         containerClassName: 'max-w-full',
@@ -2294,8 +2488,8 @@ const App: React.FC = () => {
             <div className="grid grid-cols-3 gap-10">
               <div className="col-span-2 space-y-8">
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
-                  {data.experiences.map(exp => (
+                  <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
+                  {filteredExperiences.map(exp => (
                     <div key={exp.id} className="mb-6">
                       <div className="flex justify-between font-bold text-sm">
                         <Editable tag="span" value={exp.company} onChange={v => updateExperience(exp.id, 'company', v)} />
@@ -2307,8 +2501,8 @@ const App: React.FC = () => {
                   ))}
                 </section>
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.education} onChange={v => handleTitleUpdate('education', v)} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
-                  {data.education.map(edu => (
+                  <Editable tag="h2" value={data.sectionTitles.education} onChange={v => handleTitleUpdate('education', v)} clearable={false} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
+                  {filteredEducation.map(edu => (
                     <div key={edu.id} className="mb-4 text-xs">
                       <div className="flex justify-between font-bold">
                         <Editable tag="span" value={edu.degree} onChange={v => updateEducation(edu.id, 'degree', v)} />
@@ -2321,7 +2515,7 @@ const App: React.FC = () => {
               </div>
               <div className="space-y-8">
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.personalInfo} onChange={v => handleTitleUpdate('personalInfo', v)} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
+                  <Editable tag="h2" value={data.sectionTitles.personalInfo} onChange={v => handleTitleUpdate('personalInfo', v)} clearable={false} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
                   <Editable tag="p" value={data.nationality} onChange={v => handleUpdate('nationality', v)} className="text-xs" />
                   <Editable tag="p" value={data.birthDate} onChange={v => handleUpdate('birthDate', v)} className="text-xs" />
                   <div className="mt-4 space-y-2 text-[10px] uppercase font-bold tracking-widest text-slate-500 leading-tight">
@@ -2333,15 +2527,15 @@ const App: React.FC = () => {
                   </div>
                 </section>
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
+                  <Editable tag="h2" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} clearable={false} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
                   <div className="text-xs space-y-1">
-                    {data.languages.map((l, i) => <Editable key={i} tag="p" value={l} onChange={v => updateListItem('languages', i, v)} />)}
+                    {indexedLanguages.map(({ value: l, idx: i }) => <Editable key={i} tag="p" value={l} onChange={v => updateListItem('languages', i, v)} />)}
                   </div>
                 </section>
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
+                  <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} className="text-sm font-bold uppercase border-b border-slate-300 mb-4 tracking-wider" />
                   <div className="flex flex-wrap gap-1">
-                    {data.skills.map((s, i) => <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} className="text-[10px] bg-slate-100 px-2 py-0.5" />)}
+                    {indexedSkills.map(({ value: s, idx: i }) => <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} className="text-[10px] bg-slate-100 px-2 py-0.5" />)}
                   </div>
                 </section>
               </div>
@@ -2363,7 +2557,7 @@ const App: React.FC = () => {
               </div>
               <div className="space-y-8 w-full">
                 <section>
-                  <Editable tag="h3" value={data.sectionTitles.contact} onChange={v => handleTitleUpdate('contact', v)} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" />
+                  <Editable tag="h3" value={data.sectionTitles.contact} onChange={v => handleTitleUpdate('contact', v)} clearable={false} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" />
                   <div className="text-[10px] space-y-2 text-slate-700">
                     <Editable value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} />
                     <Editable value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} />
@@ -2371,7 +2565,7 @@ const App: React.FC = () => {
                   </div>
                 </section>
                 <section>
-                  <Editable tag="h3" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" />
+                  <Editable tag="h3" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} clearable={false} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" />
                   <div className="space-y-1 text-[9px] uppercase font-bold tracking-widest text-slate-500 leading-tight">
                     {renderSocials(false, {
                       containerClassName: 'max-w-full',
@@ -2381,15 +2575,15 @@ const App: React.FC = () => {
                   </div>
                 </section>
                 <section>
-                  <Editable tag="h3" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" />
+                  <Editable tag="h3" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} clearable={false} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" />
                   <div className="text-[10px] space-y-1 text-slate-700">
-                    {data.languages.map((l, i) => <Editable key={i} value={l} onChange={v => updateListItem('languages', i, v)} />)}
+                    {indexedLanguages.map(({ value: l, idx: i }) => <Editable key={i} value={l} onChange={v => updateListItem('languages', i, v)} />)}
                   </div>
                 </section>
                 <section>
-                  <Editable tag="h3" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" />
+                  <Editable tag="h3" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" />
                   <div className="text-[10px] space-y-1 text-slate-700">
-                    {data.skills.map((s, i) => <Editable key={i} value={s} onChange={v => updateListItem('skills', i, v)} />)}
+                    {indexedSkills.map(({ value: s, idx: i }) => <Editable key={i} value={s} onChange={v => updateListItem('skills', i, v)} />)}
                   </div>
                 </section>
               </div>
@@ -2401,8 +2595,8 @@ const App: React.FC = () => {
                 <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-xs leading-relaxed text-slate-600 text-justify" />
               </section>
               <section className="mb-10">
-                <Editable tag="h3" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-100 pb-2" />
-                {data.experiences.map(exp => (
+                <Editable tag="h3" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-100 pb-2" />
+                {filteredExperiences.map(exp => (
                   <div key={exp.id} className="mb-6">
                     <Editable value={exp.period} onChange={v => updateExperience(exp.id, 'period', v)} className="text-[10px] font-bold text-slate-400 mb-1" />
                     <Editable tag="h4" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} className="text-sm font-bold text-slate-900" />
@@ -2444,16 +2638,16 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-12">
                   <section>
                     <h2 className="text-xl font-black mb-4 flex items-center gap-2 text-slate-900">
-                      <div className="w-4 h-4 bg-blue-600 rounded-full" /> <Editable tag="span" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} />
+                      <div className="w-4 h-4 bg-blue-600 rounded-full" /> <Editable tag="span" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} clearable={false} />
                     </h2>
                     <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-xs leading-relaxed text-slate-700 text-justify" />
                   </section>
                   
                   <section>
                     <h2 className="text-xl font-black mb-4 flex items-center gap-2 text-slate-900">
-                      <div className="w-4 h-4 bg-yellow-400 rounded-full" /> <Editable tag="span" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} />
+                      <div className="w-4 h-4 bg-yellow-400 rounded-full" /> <Editable tag="span" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} />
                     </h2>
-                    {data.experiences.map(exp => (
+                    {filteredExperiences.map(exp => (
                       <div key={exp.id} className="mb-5">
                         <Editable value={exp.period} onChange={v => updateExperience(exp.id, 'period', v)} className="text-[10px] font-black text-blue-600 uppercase tracking-tighter" />
                         <Editable tag="h4" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} className="font-bold text-sm text-slate-900" />
@@ -2465,10 +2659,10 @@ const App: React.FC = () => {
 
                   <section>
                     <h2 className="text-xl font-black mb-4 flex items-center gap-2 text-slate-900">
-                      <div className="w-4 h-4 bg-slate-900 rounded-full" /> <Editable tag="span" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} />
+                      <div className="w-4 h-4 bg-slate-900 rounded-full" /> <Editable tag="span" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} />
                     </h2>
                     <div className="flex flex-wrap gap-2">
-                      {data.skills.map((s, i) => (
+                      {indexedSkills.map(({ value: s, idx: i }) => (
                         <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} className="text-[10px] border-2 border-slate-900 px-2 py-1 font-black text-slate-900 uppercase" />
                       ))}
                     </div>
@@ -2476,10 +2670,10 @@ const App: React.FC = () => {
 
                   <section>
                     <h2 className="text-xl font-black mb-4 flex items-center gap-2 text-slate-900">
-                      <div className="w-4 h-4 bg-blue-400 rounded-full" /> <Editable tag="span" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} />
+                      <div className="w-4 h-4 bg-blue-400 rounded-full" /> <Editable tag="span" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} clearable={false} />
                     </h2>
                     <div className="flex flex-col gap-2">
-                      {data.languages.map((l, i) => (
+                      {indexedLanguages.map(({ value: l, idx: i }) => (
                         <div key={i} className="flex items-center gap-2 text-xs font-bold text-slate-700">
                           <CheckCircle2 className="w-3 h-3 text-blue-500" /> <Editable value={l} onChange={v => updateListItem('languages', i, v)} className="flex-1" />
                         </div>
@@ -2520,13 +2714,13 @@ const App: React.FC = () => {
              </div>
              <div className="space-y-10">
                 <section>
-                   <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} className="text-lg font-black uppercase bg-slate-900 text-white px-3 py-1 mb-4 inline-block tracking-tighter italic" />
+                   <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} clearable={false} className="text-lg font-black uppercase bg-slate-900 text-white px-3 py-1 mb-4 inline-block tracking-tighter italic" />
                    <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-sm leading-relaxed text-slate-700 text-justify" />
                 </section>
                 <section>
-                   <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} className="text-lg font-black uppercase border-b-2 border-slate-900 mb-6 inline-block" />
+                   <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} className="text-lg font-black uppercase border-b-2 border-slate-900 mb-6 inline-block" />
                    <div className="space-y-8">
-                      {data.experiences.map(exp => (
+                      {filteredExperiences.map(exp => (
                         <div key={exp.id}>
                            <div className="flex justify-between items-baseline mb-1">
                               <h3 className="text-base font-bold text-slate-900">
@@ -2541,20 +2735,20 @@ const App: React.FC = () => {
                 </section>
                 <div className="grid grid-cols-2 gap-10">
                    <section>
-                      <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} className="text-sm font-black uppercase border-b border-slate-200 mb-3" />
+                      <Editable tag="h2" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} className="text-sm font-black uppercase border-b border-slate-200 mb-3" />
                       <div className="grid grid-cols-2 gap-2 text-[11px] font-bold">
-                         {data.skills.map((s, i) => <div key={i} className="flex items-center gap-2"><div className="w-1 h-1 bg-slate-900"></div> <Editable value={s} onChange={v => updateListItem('skills', i, v)} className="flex-1" /></div>)}
+                         {indexedSkills.map(({ value: s, idx: i }) => <div key={i} className="flex items-center gap-2"><div className="w-1 h-1 bg-slate-900"></div> <Editable value={s} onChange={v => updateListItem('skills', i, v)} className="flex-1" /></div>)}
                       </div>
                       <div className="mt-6">
-                        <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} className="text-sm font-black uppercase border-b border-slate-200 mb-3" />
+                        <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} clearable={false} className="text-sm font-black uppercase border-b border-slate-200 mb-3" />
                         <div className="flex flex-col gap-2">
                            {renderSocials()}
                         </div>
                       </div>
                    </section>
                    <section>
-                      <Editable tag="h2" value={data.sectionTitles.education} onChange={v => handleTitleUpdate('education', v)} className="text-sm font-black uppercase border-b border-slate-200 mb-3" />
-                      {data.education.map(edu => (
+                      <Editable tag="h2" value={data.sectionTitles.education} onChange={v => handleTitleUpdate('education', v)} clearable={false} className="text-sm font-black uppercase border-b border-slate-200 mb-3" />
+                      {filteredEducation.map(edu => (
                         <div key={edu.id} className="mb-2">
                            <Editable tag="p" value={edu.degree} onChange={v => updateEducation(edu.id, 'degree', v)} className="text-xs font-bold" />
                            <p className="text-[10px] text-slate-500"><Editable tag="span" value={edu.school} onChange={v => updateEducation(edu.id, 'school', v)} /> (<Editable tag="span" value={edu.year} onChange={v => updateEducation(edu.id, 'year', v)} />)</p>
@@ -2584,9 +2778,9 @@ const App: React.FC = () => {
                    <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-sm leading-relaxed text-slate-600 italic" />
                 </section>
                 <section>
-                   <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} className="text-xs font-bold uppercase text-center tracking-[0.4em] mb-8 text-slate-900 border-b pb-2" />
+                   <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} className="text-xs font-bold uppercase text-center tracking-[0.4em] mb-8 text-slate-900 border-b pb-2" />
                    <div className="space-y-10">
-                      {data.experiences.map(exp => (
+                      {filteredExperiences.map(exp => (
                         <div key={exp.id} className="text-center">
                            <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} className="text-sm font-bold uppercase tracking-widest text-slate-800" />
                            <p className="text-xs italic text-slate-400 mb-3"><Editable tag="span" value={exp.company} onChange={v => updateExperience(exp.id, 'company', v)} /> • <Editable tag="span" value={exp.period} onChange={v => updateExperience(exp.id, 'period', v)} /></p>
@@ -2600,15 +2794,15 @@ const App: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-10 pt-6">
                    <div className="space-y-6">
-                      <Editable tag="h3" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-900" />
+                      <Editable tag="h3" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-900" />
                       <div className="flex flex-wrap gap-2 justify-start">
-                         {data.skills.map((s, i) => <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} className="text-[10px] font-serif italic text-slate-500" />)}
+                         {indexedSkills.map(({ value: s, idx: i }) => <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} className="text-[10px] font-serif italic text-slate-500" />)}
                       </div>
                    </div>
                    <div className="space-y-6">
-                      <Editable tag="h3" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-900" />
+                      <Editable tag="h3" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} clearable={false} className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-900" />
                       <div className="text-[10px] font-serif text-slate-500 space-y-1">
-                         {data.languages.map((l, i) => <Editable key={i} value={l} onChange={v => updateListItem('languages', i, v)} />)}
+                         {indexedLanguages.map(({ value: l, idx: i }) => <Editable key={i} value={l} onChange={v => updateListItem('languages', i, v)} />)}
                       </div>
                    </div>
                 </div>
@@ -2630,12 +2824,12 @@ const App: React.FC = () => {
              <div className="grid grid-cols-3 gap-8">
                 <div className="col-span-2 space-y-8">
                    <section>
-                      <h2 className="text-emerald-300 font-bold mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-emerald-500"></div> # <Editable tag="span" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} /></h2>
+                      <h2 className="text-emerald-300 font-bold mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-emerald-500"></div> # <Editable tag="span" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} clearable={false} /></h2>
                       <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-xs text-emerald-100/70 leading-relaxed text-justify" />
                    </section>
                    <section>
-                      <h2 className="text-emerald-300 font-bold mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-emerald-500"></div> # <Editable tag="span" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} /></h2>
-                      {data.experiences.map(exp => (
+                      <h2 className="text-emerald-300 font-bold mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-emerald-500"></div> # <Editable tag="span" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} /></h2>
+                      {filteredExperiences.map(exp => (
                         <div key={exp.id} className="mb-6 border-l border-emerald-500/20 pl-4">
                            <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} className="text-sm font-bold text-emerald-100" />
                            <p className="text-[10px] text-emerald-500 mb-2"><Editable tag="span" value={exp.company} onChange={v => updateExperience(exp.id, 'company', v)} /> // <Editable tag="span" value={exp.period} onChange={v => updateExperience(exp.id, 'period', v)} /></p>
@@ -2648,7 +2842,7 @@ const App: React.FC = () => {
                    <section className="bg-emerald-500/5 p-4 rounded border border-emerald-500/10">
                       <h2 className="text-emerald-300 text-xs font-bold mb-3 uppercase tracking-tighter">{locale.template.stackLabel}</h2>
                       <div className="flex flex-wrap gap-2">
-                         {data.skills.map((s, i) => <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} className="text-[9px] bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded border border-emerald-500/20" />)}
+                         {indexedSkills.map(({ value: s, idx: i }) => <Editable key={i} tag="span" value={s} onChange={v => updateListItem('skills', i, v)} className="text-[9px] bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded border border-emerald-500/20" />)}
                       </div>
                    </section>
                    <section>
@@ -2682,7 +2876,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="space-y-8 flex-1">
                    <section>
-                      <Editable tag="h3" value={data.sectionTitles.contact} onChange={v => handleTitleUpdate('contact', v)} className="text-xs font-black uppercase tracking-widest text-blue-400 mb-4" />
+                      <Editable tag="h3" value={data.sectionTitles.contact} onChange={v => handleTitleUpdate('contact', v)} clearable={false} className="text-xs font-black uppercase tracking-widest text-blue-400 mb-4" />
                       <div className="space-y-4 text-[10px] font-medium opacity-80">
                          <div className="flex items-center gap-3"><Mail className="w-3 h-3" /> <Editable value={data.email} onChange={v => handleUpdate('email', v)} isExample={!modifiedFields.has('email')} className="flex-1" /></div>
                          <div className="flex items-center gap-3"><Phone className="w-3 h-3" /> <Editable value={data.phone} onChange={v => handleUpdate('phone', v)} isExample={!modifiedFields.has('phone')} className="flex-1" /></div>
@@ -2690,17 +2884,17 @@ const App: React.FC = () => {
                       </div>
                    </section>
                    <section>
-                      <Editable tag="h3" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} className="text-xs font-black uppercase tracking-widest text-blue-400 mb-4" />
+                      <Editable tag="h3" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} className="text-xs font-black uppercase tracking-widest text-blue-400 mb-4" />
                       <div className="space-y-2">
-                         {data.skills.map((s, i) => (
+                         {indexedSkills.map(({ value: s, idx: i }) => (
                            <Editable key={i} value={s} onChange={v => updateListItem('skills', i, v)} className="text-[10px] font-bold bg-white/10 px-3 py-1.5 rounded-full" />
                          ))}
                       </div>
                    </section>
                    <section>
-                      <Editable tag="h3" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} className="text-xs font-black uppercase tracking-widest text-blue-400 mb-4" />
+                      <Editable tag="h3" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} clearable={false} className="text-xs font-black uppercase tracking-widest text-blue-400 mb-4" />
                       <div className="space-y-1 text-[10px] opacity-80">
-                         {data.languages.map((l, i) => <Editable key={i} value={l} onChange={v => updateListItem('languages', i, v)} />)}
+                         {indexedLanguages.map(({ value: l, idx: i }) => <Editable key={i} value={l} onChange={v => updateListItem('languages', i, v)} />)}
                       </div>
                    </section>
                 </div>
@@ -2715,9 +2909,9 @@ const App: React.FC = () => {
                       <Editable value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-sm leading-relaxed text-slate-600 border-l-4 border-slate-100 pl-6 italic" />
                    </section>
                    <section>
-                      <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} className="text-sm font-black uppercase tracking-[0.2em] text-slate-900 border-b-2 border-slate-900 pb-2 mb-8 inline-block" />
+                      <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} className="text-sm font-black uppercase tracking-[0.2em] text-slate-900 border-b-2 border-slate-900 pb-2 mb-8 inline-block" />
                       <div className="space-y-10">
-                         {data.experiences.map(exp => (
+                         {filteredExperiences.map(exp => (
                            <div key={exp.id}>
                               <div className="flex justify-between items-baseline mb-2">
                                  <Editable tag="h3" value={exp.role} onChange={v => updateExperience(exp.id, 'role', v)} className="font-black text-slate-800 uppercase text-xs" />
@@ -2730,7 +2924,7 @@ const App: React.FC = () => {
                       </div>
                    </section>
                    <section>
-                      <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} className="text-sm font-black uppercase tracking-[0.2em] text-slate-900 border-b-2 border-slate-900 pb-2 mb-8 inline-block" />
+                      <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} clearable={false} className="text-sm font-black uppercase tracking-[0.2em] text-slate-900 border-b-2 border-slate-900 pb-2 mb-8 inline-block" />
                       <div className="flex gap-4">
                         {renderSocials()}
                       </div>
@@ -2768,13 +2962,13 @@ const App: React.FC = () => {
             <div className="flex flex-1 flex-col md:flex-row">
               <div className="md:flex-[2] p-10 space-y-12 border-r border-slate-50">
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} className="text-lg font-black uppercase text-slate-900 border-b-2 border-blue-500 inline-block mb-6" />
+                  <Editable tag="h2" value={data.sectionTitles.summary} onChange={v => handleTitleUpdate('summary', v)} clearable={false} className="text-lg font-black uppercase text-slate-900 border-b-2 border-blue-500 inline-block mb-6" />
                   <Editable tag="p" value={data.summary} onChange={v => handleUpdate('summary', v)} isExample={!modifiedFields.has('summary')} className="text-slate-600 text-sm leading-relaxed text-justify" />
                 </section>
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} className="text-lg font-black uppercase text-slate-900 border-b-2 border-blue-500 inline-block mb-8" />
+                  <Editable tag="h2" value={data.sectionTitles.experience} onChange={v => handleTitleUpdate('experience', v)} clearable={false} className="text-lg font-black uppercase text-slate-900 border-b-2 border-blue-500 inline-block mb-8" />
                   <div className="space-y-10">
-                    {data.experiences.map(exp => (
+                    {filteredExperiences.map(exp => (
                       <div key={exp.id} className="relative pl-6 border-l-2 border-blue-100">
                         <div className="absolute w-3 h-3 bg-blue-500 rounded-full -left-[7.5px] top-1.5 shadow-sm" />
                         <div className="flex justify-between items-baseline mb-2">
@@ -2788,9 +2982,9 @@ const App: React.FC = () => {
                   </div>
                 </section>
                 <section>
-                  <Editable tag="h2" value={data.sectionTitles.education} onChange={v => handleTitleUpdate('education', v)} className="text-lg font-black uppercase text-slate-900 border-b-2 border-blue-500 inline-block mb-8" />
+                  <Editable tag="h2" value={data.sectionTitles.education} onChange={v => handleTitleUpdate('education', v)} clearable={false} className="text-lg font-black uppercase text-slate-900 border-b-2 border-blue-500 inline-block mb-8" />
                   <div className="space-y-6">
-                    {data.education.map(edu => (
+                    {filteredEducation.map(edu => (
                       <div key={edu.id} className="flex justify-between items-start">
                         <div>
                           <Editable tag="h3" value={edu.degree} onChange={v => updateEducation(edu.id, 'degree', v)} className="font-bold text-slate-900 text-sm" />
@@ -2802,7 +2996,7 @@ const App: React.FC = () => {
                   </div>
                 </section>
                 <section>
-                   <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} className="text-lg font-black uppercase text-slate-900 border-b-2 border-blue-500 inline-block mb-8" />
+                   <Editable tag="h2" value={data.sectionTitles.social} onChange={v => handleTitleUpdate('social', v)} clearable={false} className="text-lg font-black uppercase text-slate-900 border-b-2 border-blue-500 inline-block mb-8" />
                    <div className="flex flex-col gap-4">
                       {renderSocials()}
                    </div>
@@ -2812,23 +3006,23 @@ const App: React.FC = () => {
                 <section>
                   <h2 className="text-xs font-black uppercase text-slate-900 tracking-[0.2em] mb-6 flex items-center gap-2">
                     <Globe className="w-4 h-4 text-blue-500" />
-                    <Editable tag="span" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} />
+                    <Editable tag="span" value={data.sectionTitles.languages} onChange={v => handleTitleUpdate('languages', v)} clearable={false} />
                   </h2>
-                  <div className="space-y-3">{data.languages.map((lang, i) => <Editable key={i} value={lang} onChange={v => updateListItem('languages', i, v)} className="text-sm font-medium text-slate-700 bg-white p-2 rounded border border-slate-100 shadow-sm" />)}</div>
+                  <div className="space-y-3">{indexedLanguages.map(({ value: lang, idx: i }) => <Editable key={i} value={lang} onChange={v => updateListItem('languages', i, v)} className="text-sm font-medium text-slate-700 bg-white p-2 rounded border border-slate-100 shadow-sm" />)}</div>
                 </section>
                 <section>
                   <h2 className="text-xs font-black uppercase text-slate-900 tracking-[0.2em] mb-6 flex items-center gap-2">
                     <Code className="w-4 h-4 text-blue-500" />
-                    <Editable tag="span" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} />
+                    <Editable tag="span" value={data.sectionTitles.skills} onChange={v => handleTitleUpdate('skills', v)} clearable={false} />
                   </h2>
-                  <div className="flex flex-wrap gap-2">{data.skills.map((skill, i) => <Editable key={i} tag="span" value={skill} onChange={v => updateListItem('skills', i, v)} className="bg-slate-900 text-white px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider" />)}</div>
+                  <div className="flex flex-wrap gap-2">{indexedSkills.map(({ value: skill, idx: i }) => <Editable key={i} tag="span" value={skill} onChange={v => updateListItem('skills', i, v)} className="bg-slate-900 text-white px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider" />)}</div>
                 </section>
                 <section>
                   <h2 className="text-xs font-black uppercase text-slate-900 tracking-[0.2em] mb-6 flex items-center gap-2">
                     <User className="w-4 h-4 text-blue-500" />
-                    <Editable tag="span" value={data.sectionTitles.softSkills} onChange={v => handleTitleUpdate('softSkills', v)} />
+                    <Editable tag="span" value={data.sectionTitles.softSkills} onChange={v => handleTitleUpdate('softSkills', v)} clearable={false} />
                   </h2>
-                  <div className="space-y-2">{data.softSkills.map((skill, i) => <div key={i} className="flex items-center gap-2 text-[11px] font-bold text-slate-600"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> <Editable tag="span" value={skill} onChange={v => updateListItem('softSkills', i, v)} className="flex-1" /></div>)}</div>
+                  <div className="space-y-2">{indexedSoftSkills.map(({ value: skill, idx: i }) => <div key={i} className="flex items-center gap-2 text-[11px] font-bold text-slate-600"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> <Editable tag="span" value={skill} onChange={v => updateListItem('softSkills', i, v)} className="flex-1" /></div>)}</div>
                 </section>
                 <div className="pt-12"><p className="text-[9px] text-slate-400 leading-tight italic">{locale.ui.privacyNote}</p></div>
               </aside>
@@ -2875,6 +3069,40 @@ const App: React.FC = () => {
                   <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/5 transition-colors pointer-events-none" />
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Clear Save Modal */}
+      {isClearModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[110] flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 md:p-8 relative">
+            <button
+              onClick={() => setIsClearModalOpen(false)}
+              className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full text-slate-500 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="space-y-4">
+              <h2 className="text-lg font-black text-slate-900">{locale.ui.clearTitle}</h2>
+              <p className="text-sm text-slate-600">{locale.ui.clearMessage}</p>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setIsClearModalOpen(false)}
+                  className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                >
+                  {locale.ui.clearCancel}
+                </button>
+                <button
+                  onClick={() => {
+                    handleClearSaved();
+                    setIsClearModalOpen(false);
+                  }}
+                  className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-full bg-red-600 text-white hover:bg-red-700 transition"
+                >
+                  {locale.ui.clearConfirm}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2964,32 +3192,22 @@ const App: React.FC = () => {
 
           <section className="space-y-3">
             <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">{data.sectionTitles.contact}</h3>
-            <div className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
-              <Mail className="w-4 h-4 text-slate-500" />
-              <input className="bg-transparent border-none text-sm w-full outline-none text-white" value={data.email} onChange={e => handleUpdate('email', e.target.value)} />
-            </div>
-            <div className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
-              <Phone className="w-4 h-4 text-slate-500" />
-              <input className="bg-transparent border-none text-sm w-full outline-none text-white" value={data.phone} onChange={e => handleUpdate('phone', e.target.value)} />
-            </div>
+            {curriculoguiContactItems.map(item => (
+              <div key={item.id} className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
+                {item.icon}
+                <input
+                  className="bg-transparent border-none text-sm w-full outline-none text-white"
+                  value={data[item.id as keyof CVData] as string}
+                  onChange={e => handleUpdate(item.id as keyof CVData, e.target.value)}
+                />
+              </div>
+            ))}
           </section>
 
           <section className="space-y-3">
             <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">{data.sectionTitles.social}</h3>
             <div className="space-y-2">
-              {(isEuropass
-                ? [
-                    { id: 'linkedin', icon: <Linkedin className="w-4 h-4 text-slate-500" />, placeholder: "Linkedin URL" },
-                    { id: 'portfolio', icon: <ExternalLink className="w-4 h-4 text-slate-500" />, placeholder: "Portfolio URL" }
-                  ]
-                : [
-                    { id: 'github', icon: <Github className="w-4 h-4 text-slate-500" />, placeholder: "Github URL" },
-                    { id: 'linkedin', icon: <Linkedin className="w-4 h-4 text-slate-500" />, placeholder: "Linkedin URL" },
-                    { id: 'portfolio', icon: <ExternalLink className="w-4 h-4 text-slate-500" />, placeholder: "Portfolio URL" },
-                    { id: 'instagram', icon: <Instagram className="w-4 h-4 text-slate-500" />, placeholder: "Instagram Handle" },
-                    { id: 'twitter', icon: <Twitter className="w-4 h-4 text-slate-500" />, placeholder: "Twitter/X Handle" }
-                  ]
-              ).map(item => (
+              {curriculoguiSocialItems.map(item => (
                 <div key={item.id} className="flex items-center gap-3 bg-slate-800 rounded-lg p-3">
                   {item.icon}
                   <input
@@ -3018,7 +3236,7 @@ const App: React.FC = () => {
               <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">{data.sectionTitles.experience}</h3>
               <button onClick={addExperience} className="p-1 text-blue-400 hover:bg-slate-800 rounded-full"><Plus className="w-4 h-4" /></button>
             </div>
-            {data.experiences.map(exp => (
+            {filteredExperiences.map(exp => (
               <div key={exp.id} className="p-4 bg-slate-800 rounded-xl space-y-3 border border-slate-700 text-white">
                 <div className="flex justify-between items-center">
                   <input className="bg-transparent border-none text-sm font-bold w-full outline-none text-blue-400" value={exp.company} onChange={e => updateExperience(exp.id, 'company', e.target.value)} placeholder="Azienda" />
@@ -3041,7 +3259,7 @@ const App: React.FC = () => {
                   <button onClick={addLanguageSkill} className="text-blue-400"><Plus className="w-4 h-4" /></button>
                 </div>
                 <div className="space-y-2">
-                  {data.languageSkills.map(skill => (
+                  {filteredLanguageSkills.map(skill => (
                     <div key={skill.id} className="grid grid-cols-[1.2fr_.8fr_.8fr_.8fr_auto] gap-2 items-center">
                       <input
                         className="bg-slate-800 border-none rounded-lg p-2 text-sm text-white"
@@ -3097,6 +3315,32 @@ const App: React.FC = () => {
       </aside>
 
       <main className="flex-1 bg-gray-100 p-4 md:p-12 overflow-y-auto print-padding flex flex-col items-center gap-6 relative">
+        <div className="absolute top-4 left-4 z-30 no-print flex items-center gap-2">
+          <button
+            onClick={handleUndo}
+            disabled={undoStack.length <= 1}
+            className={`w-9 h-9 rounded-full border shadow-md flex items-center justify-center transition ${
+              undoStack.length <= 1
+                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            title="Undo"
+          >
+            ↶
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={redoStack.length === 0}
+            className={`w-9 h-9 rounded-full border shadow-md flex items-center justify-center transition ${
+              redoStack.length === 0
+                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            title="Redo"
+          >
+            ↷
+          </button>
+        </div>
         <div className="absolute top-4 right-4 z-30 no-print flex flex-col items-end gap-2">
           <div className="flex items-center gap-1 bg-white/90 border border-slate-200 rounded-full p-1 shadow-md">
             {(Object.keys(LOCALES) as Language[]).map(lang => (
@@ -3111,18 +3355,26 @@ const App: React.FC = () => {
               </button>
             ))}
           </div>
-          <button
-            onClick={handleSaveToBrowser}
-            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-full shadow-md border transition ${
-              saveStatus === 'saved'
-                ? 'bg-emerald-500 text-white border-emerald-400'
-                : saveStatus === 'error'
-                  ? 'bg-red-500 text-white border-red-400'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            {saveStatus === 'saved' ? locale.ui.saved : locale.ui.save}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSaveToBrowser}
+              className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-full shadow-md border transition ${
+                saveStatus === 'saved'
+                  ? 'bg-emerald-500 text-white border-emerald-400'
+                  : saveStatus === 'error'
+                    ? 'bg-red-500 text-white border-red-400'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {saveStatus === 'saved' ? locale.ui.saved : locale.ui.save}
+            </button>
+            <button
+              onClick={() => setIsClearModalOpen(true)}
+              className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-full shadow-md border transition bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+            >
+              {locale.ui.clear}
+            </button>
+          </div>
         </div>
         <div className="bg-blue-600 text-white px-6 py-2 rounded-full text-xs font-bold flex items-center gap-2 shadow-lg animate-bounce no-print">
           <Edit3 className="w-4 h-4" /> {locale.ui.clickToEdit}

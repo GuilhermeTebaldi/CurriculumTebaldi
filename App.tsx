@@ -29,7 +29,7 @@ import {
   Twitter,
   Settings2
 } from 'lucide-react';
-import { CVData, WorkExperience, Education, CVTemplate, SectionTitles, LanguageSkill, EuropassSectionTitles } from './types';
+import { CVData, WorkExperience, Education, CVTemplate, SectionTitles, LanguageSkill, EuropassSectionTitles, EuropassLabels } from './types';
 import { optimizeText } from './services/geminiService';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -52,6 +52,33 @@ const EUROPASS_SECTION_KEYS: Array<keyof EuropassSectionTitles> = [
   'organizationalSkills',
   'professionalSkills',
   'additionalInfo'
+];
+
+const EUROPASS_LABEL_KEYS: Array<keyof EuropassLabels> = [
+  'fullName',
+  'role',
+  'location',
+  'phone',
+  'email',
+  'nationality',
+  'birthDate',
+  'portfolio',
+  'linkedin',
+  'github',
+  'instagram',
+  'twitter'
+];
+
+const EUROPASS_PERSONAL_INFO_KEYS: Array<keyof EuropassLabels> = [
+  'fullName',
+  'role',
+  'location',
+  'phone',
+  'email',
+  'nationality',
+  'birthDate',
+  'portfolio',
+  'linkedin'
 ];
 
 // Europass-specific defaults for CEFR language table.
@@ -612,8 +639,15 @@ const getDefaultEuropassSectionTitles = (lang: Language): EuropassSectionTitles 
   };
 };
 
+const getDefaultEuropassLabels = (lang: Language): EuropassLabels => ({
+  ...LOCALES[lang].europass.labels
+});
+
 const isEuropassSectionKey = (value: unknown): value is keyof EuropassSectionTitles =>
   typeof value === 'string' && EUROPASS_SECTION_KEYS.includes(value as keyof EuropassSectionTitles);
+
+const isEuropassLabelKey = (value: unknown): value is keyof EuropassLabels =>
+  typeof value === 'string' && EUROPASS_LABEL_KEYS.includes(value as keyof EuropassLabels);
 
 const INITIAL_DATA: CVData = {
   fullName: "Guilherme Tebaldi",
@@ -658,7 +692,9 @@ const INITIAL_DATA: CVData = {
   additionalInfo: ["Patente B"],
   sectionTitles: { ...LOCALES.it.sectionTitles },
   europassSectionTitles: getDefaultEuropassSectionTitles('it'),
-  europassHiddenSections: []
+  europassLabels: getDefaultEuropassLabels('it'),
+  europassHiddenSections: [],
+  europassHiddenPersonalInfoFields: []
 };
 
 const isLanguageSkill = (item: any): item is LanguageSkill =>
@@ -686,9 +722,16 @@ const mergeWithDefaults = (incoming: CVData): CVData => ({
     ...INITIAL_DATA.europassSectionTitles,
     ...((incoming as any).europassSectionTitles ?? {})
   },
+  europassLabels: {
+    ...INITIAL_DATA.europassLabels,
+    ...((incoming as any).europassLabels ?? {})
+  },
   europassHiddenSections: Array.isArray((incoming as any).europassHiddenSections)
     ? (incoming as any).europassHiddenSections.filter(isEuropassSectionKey)
     : INITIAL_DATA.europassHiddenSections,
+  europassHiddenPersonalInfoFields: Array.isArray((incoming as any).europassHiddenPersonalInfoFields)
+    ? (incoming as any).europassHiddenPersonalInfoFields.filter(isEuropassLabelKey)
+    : INITIAL_DATA.europassHiddenPersonalInfoFields,
   experiences: Array.isArray(incoming.experiences) ? incoming.experiences : INITIAL_DATA.experiences,
   education: Array.isArray(incoming.education) ? incoming.education : INITIAL_DATA.education,
   skills: Array.isArray(incoming.skills) ? incoming.skills : INITIAL_DATA.skills,
@@ -1241,6 +1284,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const titles = LOCALES[language].sectionTitles;
     const europaDefaults = getDefaultEuropassSectionTitles(language);
+    const europaLabelDefaults = getDefaultEuropassLabels(language);
     setData(prev => {
       const nextTitles = { ...prev.sectionTitles };
       (Object.keys(titles) as Array<keyof SectionTitles>).forEach(key => {
@@ -1254,7 +1298,18 @@ const App: React.FC = () => {
           nextEuropassTitles[key] = europaDefaults[key];
         }
       });
-      return { ...prev, sectionTitles: nextTitles, europassSectionTitles: nextEuropassTitles };
+      const nextEuropassLabels = { ...prev.europassLabels };
+      EUROPASS_LABEL_KEYS.forEach(key => {
+        if (!modifiedFields.has(`europass_label_${key}`)) {
+          nextEuropassLabels[key] = europaLabelDefaults[key];
+        }
+      });
+      return {
+        ...prev,
+        sectionTitles: nextTitles,
+        europassSectionTitles: nextEuropassTitles,
+        europassLabels: nextEuropassLabels
+      };
     });
   }, [language, modifiedFields]);
 
@@ -1279,6 +1334,14 @@ const App: React.FC = () => {
     setModifiedFields(prev => new Set(prev).add(`europass_title_${String(field)}`));
   };
 
+  const handleEuropassLabelUpdate = (field: keyof EuropassLabels, value: string) => {
+    setData(prev => ({
+      ...prev,
+      europassLabels: { ...prev.europassLabels, [field]: value }
+    }));
+    setModifiedFields(prev => new Set(prev).add(`europass_label_${String(field)}`));
+  };
+
   const toggleEuropassSectionVisibility = (section: keyof EuropassSectionTitles) => {
     setData(prev => {
       const hidden = new Set(prev.europassHiddenSections);
@@ -1290,6 +1353,19 @@ const App: React.FC = () => {
       return { ...prev, europassHiddenSections: Array.from(hidden) };
     });
     setModifiedFields(prev => new Set(prev).add(`europass_hidden_${String(section)}`));
+  };
+
+  const toggleEuropassPersonalInfoFieldVisibility = (field: keyof EuropassLabels) => {
+    setData(prev => {
+      const hidden = new Set(prev.europassHiddenPersonalInfoFields);
+      if (hidden.has(field)) {
+        hidden.delete(field);
+      } else {
+        hidden.add(field);
+      }
+      return { ...prev, europassHiddenPersonalInfoFields: Array.from(hidden) };
+    });
+    setModifiedFields(prev => new Set(prev).add(`europass_hidden_field_${String(field)}`));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1704,6 +1780,8 @@ const App: React.FC = () => {
   );
   const isEuropassSectionVisible = (section: keyof EuropassSectionTitles) =>
     !data.europassHiddenSections.includes(section);
+  const isEuropassPersonalInfoFieldVisible = (field: keyof EuropassLabels) =>
+    !data.europassHiddenPersonalInfoFields.includes(field);
   const curriculoguiSocialItems = (isEuropass
     ? [
         { id: 'linkedin', icon: <Linkedin className="w-4 h-4 text-slate-500" />, placeholder: "Linkedin URL" },
@@ -1729,16 +1807,27 @@ const App: React.FC = () => {
     const europass = locale.europass;
     const europassTitles = data.europassSectionTitles;
     const renderEuropassList = (items: string[], field: ListField, emptyLabel: string) => {
-      if (!items || items.length === 0) {
+      const visibleItems = (items ?? [])
+        .map((value, idx) => ({ value, idx }))
+        .filter(item => hasText(item.value));
+
+      if (visibleItems.length === 0) {
         return <p className="text-slate-500 italic">{emptyLabel}</p>;
       }
+
       return (
         <ul className="list-disc pl-5 space-y-1">
-          {items.map((item, idx) => (
+          {visibleItems.map(({ value, idx }) => (
             <li key={`${field}-${idx}`}>
               <Editable
-                value={item}
-                onChange={v => updateListItem(field, idx, v)}
+                value={value}
+                onChange={v => {
+                  if (!hasText(v)) {
+                    removeListItem(field, idx);
+                    return;
+                  }
+                  updateListItem(field, idx, v);
+                }}
                 isExample={!modifiedFields.has(`${field}_${idx}`)}
               />
             </li>
@@ -1789,29 +1878,34 @@ const App: React.FC = () => {
                   tag="h2"
                   value={europassTitles.personalInfo}
                   onChange={v => handleEuropassTitleUpdate('personalInfo', v)}
-                  clearable={false}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 <div className="grid grid-cols-[140px_1fr] gap-y-1">
                   {[
-                    { label: europass.labels.fullName, field: 'fullName', value: data.fullName, required: true },
-                    { label: europass.labels.role, field: 'role', value: data.role, required: true },
-                    { label: europass.labels.location, field: 'location', value: data.location },
-                    { label: europass.labels.phone, field: 'phone', value: data.phone },
-                    { label: europass.labels.email, field: 'email', value: data.email },
-                    { label: europass.labels.nationality, field: 'nationality', value: data.nationality },
-                    { label: europass.labels.birthDate, field: 'birthDate', value: data.birthDate },
-                    { label: europass.labels.portfolio, field: 'portfolio', value: data.portfolio },
-                    { label: europass.labels.linkedin, field: 'linkedin', value: data.linkedin }
+                    { labelField: 'fullName' as const, valueField: 'fullName' as const },
+                    { labelField: 'role' as const, valueField: 'role' as const },
+                    { labelField: 'location' as const, valueField: 'location' as const },
+                    { labelField: 'phone' as const, valueField: 'phone' as const },
+                    { labelField: 'email' as const, valueField: 'email' as const },
+                    { labelField: 'nationality' as const, valueField: 'nationality' as const },
+                    { labelField: 'birthDate' as const, valueField: 'birthDate' as const },
+                    { labelField: 'portfolio' as const, valueField: 'portfolio' as const },
+                    { labelField: 'linkedin' as const, valueField: 'linkedin' as const }
                   ]
-                    .filter(row => row.required || (row.value ?? '').trim() !== '')
+                    .filter(row =>
+                      isEuropassPersonalInfoFieldVisible(row.labelField) && hasText(data[row.valueField] as string)
+                    )
                     .map(row => (
-                      <React.Fragment key={row.field}>
-                        <div className="font-semibold">{row.label}</div>
+                      <React.Fragment key={row.valueField}>
                         <Editable
-                          value={row.value}
-                          onChange={v => handleUpdate(row.field as keyof CVData, v)}
-                          isExample={!modifiedFields.has(row.field)}
+                          value={data.europassLabels[row.labelField]}
+                          onChange={v => handleEuropassLabelUpdate(row.labelField, v)}
+                          className="font-semibold"
+                        />
+                        <Editable
+                          value={data[row.valueField] as string}
+                          onChange={v => handleUpdate(row.valueField as keyof CVData, v)}
+                          isExample={!modifiedFields.has(row.valueField)}
                           className="break-all"
                         />
                       </React.Fragment>
@@ -1826,7 +1920,6 @@ const App: React.FC = () => {
                   tag="h2"
                   value={europassTitles.profile}
                   onChange={v => handleEuropassTitleUpdate('profile', v)}
-                  clearable={false}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 <Editable
@@ -1844,7 +1937,6 @@ const App: React.FC = () => {
                   tag="h2"
                   value={europassTitles.experience}
                   onChange={v => handleEuropassTitleUpdate('experience', v)}
-                  clearable={false}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 <div className="space-y-4">
@@ -1892,7 +1984,6 @@ const App: React.FC = () => {
                   tag="h2"
                   value={europassTitles.education}
                   onChange={v => handleEuropassTitleUpdate('education', v)}
-                  clearable={false}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 <div className="space-y-4">
@@ -1934,7 +2025,6 @@ const App: React.FC = () => {
                   tag="h2"
                   value={europassTitles.languageSkills}
                   onChange={v => handleEuropassTitleUpdate('languageSkills', v)}
-                  clearable={false}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 <table className="w-full border border-slate-300 text-[11px]">
@@ -1997,7 +2087,6 @@ const App: React.FC = () => {
                   tag="h2"
                   value={europassTitles.digitalSkills}
                   onChange={v => handleEuropassTitleUpdate('digitalSkills', v)}
-                  clearable={false}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 {renderEuropassList(data.digitalSkills, 'digitalSkills', locale.ui.emptySkills)}
@@ -2010,7 +2099,6 @@ const App: React.FC = () => {
                   tag="h2"
                   value={europassTitles.organizationalSkills}
                   onChange={v => handleEuropassTitleUpdate('organizationalSkills', v)}
-                  clearable={false}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 {renderEuropassList(data.organizationalSkills, 'organizationalSkills', locale.ui.emptySoftSkills)}
@@ -2023,7 +2111,6 @@ const App: React.FC = () => {
                   tag="h2"
                   value={europassTitles.professionalSkills}
                   onChange={v => handleEuropassTitleUpdate('professionalSkills', v)}
-                  clearable={false}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 {renderEuropassList(data.professionalSkills, 'professionalSkills', locale.ui.emptySkills)}
@@ -2036,7 +2123,6 @@ const App: React.FC = () => {
                   tag="h2"
                   value={europassTitles.additionalInfo}
                   onChange={v => handleEuropassTitleUpdate('additionalInfo', v)}
-                  clearable={false}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 {renderEuropassList(data.additionalInfo, 'additionalInfo', locale.ui.emptySoftSkills)}
@@ -3407,6 +3493,32 @@ const App: React.FC = () => {
                         />
                         <button
                           onClick={() => toggleEuropassSectionVisibility(section)}
+                          className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${
+                            isVisible ? 'bg-red-600/20 text-red-300' : 'bg-emerald-600/20 text-emerald-300'
+                          }`}
+                        >
+                          {isVisible ? locale.ui.removeTab : locale.ui.addTab}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">Campi Informazioni Personali</h3>
+                <div className="space-y-2">
+                  {EUROPASS_PERSONAL_INFO_KEYS.map(field => {
+                    const isVisible = isEuropassPersonalInfoFieldVisible(field);
+                    return (
+                      <div key={field} className="flex items-center gap-2 bg-slate-800 rounded-lg p-2 border border-slate-700">
+                        <input
+                          className="flex-1 bg-transparent border-none text-sm text-white outline-none"
+                          value={data.europassLabels[field]}
+                          onChange={e => handleEuropassLabelUpdate(field, e.target.value)}
+                        />
+                        <button
+                          onClick={() => toggleEuropassPersonalInfoFieldVisibility(field)}
                           className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${
                             isVisible ? 'bg-red-600/20 text-red-300' : 'bg-emerald-600/20 text-emerald-300'
                           }`}

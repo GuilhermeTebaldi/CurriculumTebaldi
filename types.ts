@@ -63,6 +63,11 @@ export interface EuropassLabels {
   twitter: string;
 }
 
+export interface EuropassPersonalInfoValues {
+  fullName: string;
+  role: string;
+}
+
 export interface CVData {
   fullName: string;
   role: string;
@@ -93,6 +98,7 @@ export interface CVData {
   sectionTitles: SectionTitles;
   europassSectionTitles: EuropassSectionTitles;
   europassLabels: EuropassLabels;
+  europassPersonalInfoValues: EuropassPersonalInfoValues;
   europassHiddenSections: Array<keyof EuropassSectionTitles>;
   europassHiddenPersonalInfoFields: Array<keyof EuropassLabels>;
 }

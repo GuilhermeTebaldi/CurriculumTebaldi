@@ -29,7 +29,7 @@ import {
   Twitter,
   Settings2
 } from 'lucide-react';
-import { CVData, WorkExperience, Education, CVTemplate, SectionTitles, LanguageSkill, EuropassSectionTitles, EuropassLabels } from './types';
+import { CVData, WorkExperience, Education, CVTemplate, SectionTitles, LanguageSkill, EuropassSectionTitles, EuropassLabels, EuropassPersonalInfoValues } from './types';
 import { optimizeText } from './services/geminiService';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -80,6 +80,8 @@ const EUROPASS_PERSONAL_INFO_KEYS: Array<keyof EuropassLabels> = [
   'portfolio',
   'linkedin'
 ];
+
+const EUROPASS_PERSONAL_INFO_VALUE_KEYS: Array<keyof EuropassPersonalInfoValues> = ['fullName', 'role'];
 
 // Europass-specific defaults for CEFR language table.
 const DEFAULT_LANGUAGE_LEVELS = {
@@ -693,6 +695,10 @@ const INITIAL_DATA: CVData = {
   sectionTitles: { ...LOCALES.it.sectionTitles },
   europassSectionTitles: getDefaultEuropassSectionTitles('it'),
   europassLabels: getDefaultEuropassLabels('it'),
+  europassPersonalInfoValues: {
+    fullName: "Guilherme Tebaldi",
+    role: "Full Stack Developer & Marketing Specialist"
+  },
   europassHiddenSections: [],
   europassHiddenPersonalInfoFields: []
 };
@@ -725,6 +731,14 @@ const mergeWithDefaults = (incoming: CVData): CVData => ({
   europassLabels: {
     ...INITIAL_DATA.europassLabels,
     ...((incoming as any).europassLabels ?? {})
+  },
+  europassPersonalInfoValues: {
+    fullName: typeof (incoming as any).europassPersonalInfoValues?.fullName === 'string'
+      ? (incoming as any).europassPersonalInfoValues.fullName
+      : (typeof incoming.fullName === 'string' ? incoming.fullName : INITIAL_DATA.europassPersonalInfoValues.fullName),
+    role: typeof (incoming as any).europassPersonalInfoValues?.role === 'string'
+      ? (incoming as any).europassPersonalInfoValues.role
+      : (typeof incoming.role === 'string' ? incoming.role : INITIAL_DATA.europassPersonalInfoValues.role)
   },
   europassHiddenSections: Array.isArray((incoming as any).europassHiddenSections)
     ? (incoming as any).europassHiddenSections.filter(isEuropassSectionKey)
@@ -1314,7 +1328,22 @@ const App: React.FC = () => {
   }, [language, modifiedFields]);
 
   const handleUpdate = (field: keyof CVData | string, value: any) => {
-    setData(prev => ({ ...prev, [field]: value } as any));
+    setData(prev => {
+      const next = { ...prev, [field]: value } as CVData;
+      if (field === 'fullName' && !modifiedFields.has('europass_info_value_fullName')) {
+        next.europassPersonalInfoValues = {
+          ...prev.europassPersonalInfoValues,
+          fullName: String(value ?? '')
+        };
+      }
+      if (field === 'role' && !modifiedFields.has('europass_info_value_role')) {
+        next.europassPersonalInfoValues = {
+          ...prev.europassPersonalInfoValues,
+          role: String(value ?? '')
+        };
+      }
+      return next;
+    });
     setModifiedFields(prev => new Set(prev).add(String(field)));
   };
 
@@ -1340,6 +1369,14 @@ const App: React.FC = () => {
       europassLabels: { ...prev.europassLabels, [field]: value }
     }));
     setModifiedFields(prev => new Set(prev).add(`europass_label_${String(field)}`));
+  };
+
+  const handleEuropassPersonalInfoValueUpdate = (field: keyof EuropassPersonalInfoValues, value: string) => {
+    setData(prev => ({
+      ...prev,
+      europassPersonalInfoValues: { ...prev.europassPersonalInfoValues, [field]: value }
+    }));
+    setModifiedFields(prev => new Set(prev).add(`europass_info_value_${String(field)}`));
   };
 
   const toggleEuropassSectionVisibility = (section: keyof EuropassSectionTitles) => {
@@ -1882,8 +1919,8 @@ const App: React.FC = () => {
                 />
                 <div className="grid grid-cols-[140px_1fr] gap-y-1">
                   {[
-                    { labelField: 'fullName' as const, valueField: 'fullName' as const },
-                    { labelField: 'role' as const, valueField: 'role' as const },
+                    { labelField: 'fullName' as const, valueField: 'fullName' as const, personalValueField: 'fullName' as const },
+                    { labelField: 'role' as const, valueField: 'role' as const, personalValueField: 'role' as const },
                     { labelField: 'location' as const, valueField: 'location' as const },
                     { labelField: 'phone' as const, valueField: 'phone' as const },
                     { labelField: 'email' as const, valueField: 'email' as const },
@@ -1893,7 +1930,12 @@ const App: React.FC = () => {
                     { labelField: 'linkedin' as const, valueField: 'linkedin' as const }
                   ]
                     .filter(row =>
-                      isEuropassPersonalInfoFieldVisible(row.labelField) && hasText(data[row.valueField] as string)
+                      isEuropassPersonalInfoFieldVisible(row.labelField) &&
+                      hasText(
+                        row.personalValueField
+                          ? data.europassPersonalInfoValues[row.personalValueField]
+                          : (data[row.valueField] as string)
+                      )
                     )
                     .map(row => (
                       <React.Fragment key={row.valueField}>
@@ -1903,9 +1945,23 @@ const App: React.FC = () => {
                           className="font-semibold"
                         />
                         <Editable
-                          value={data[row.valueField] as string}
-                          onChange={v => handleUpdate(row.valueField as keyof CVData, v)}
-                          isExample={!modifiedFields.has(row.valueField)}
+                          value={
+                            row.personalValueField
+                              ? data.europassPersonalInfoValues[row.personalValueField]
+                              : (data[row.valueField] as string)
+                          }
+                          onChange={v => {
+                            if (row.personalValueField) {
+                              handleEuropassPersonalInfoValueUpdate(row.personalValueField, v);
+                            } else {
+                              handleUpdate(row.valueField as keyof CVData, v);
+                            }
+                          }}
+                          isExample={
+                            row.personalValueField
+                              ? !modifiedFields.has(`europass_info_value_${row.personalValueField}`)
+                              : !modifiedFields.has(row.valueField)
+                          }
                           className="break-all"
                         />
                       </React.Fragment>
@@ -3528,6 +3584,22 @@ const App: React.FC = () => {
                       </div>
                     );
                   })}
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">Valori separati (Nome/Ruolo)</h3>
+                <div className="space-y-2">
+                  {EUROPASS_PERSONAL_INFO_VALUE_KEYS.map(field => (
+                    <div key={field} className="flex items-center gap-2 bg-slate-800 rounded-lg p-2 border border-slate-700">
+                      <input
+                        className="flex-1 bg-transparent border-none text-sm text-white outline-none"
+                        value={data.europassPersonalInfoValues[field]}
+                        onChange={e => handleEuropassPersonalInfoValueUpdate(field, e.target.value)}
+                        placeholder={field === 'fullName' ? 'Nome e cognome (separato)' : 'Titolo professionale (separato)'}
+                      />
+                    </div>
+                  ))}
                 </div>
               </section>
 

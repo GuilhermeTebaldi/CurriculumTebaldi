@@ -1147,6 +1147,7 @@ const App: React.FC = () => {
   const isHistoryActionRef = useRef(false);
   const lastSnapshotRef = useRef<string>('');
   const isGeneratingPDFRef = useRef(false);
+  const hasHydratedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cvRef = useRef<HTMLDivElement>(null);
 
@@ -1205,22 +1206,39 @@ const App: React.FC = () => {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed?.data) {
-        const nextData = parsed.data as CVData;
-        setData(mergeWithDefaults(nextData));
-      }
-      if (Array.isArray(parsed?.modifiedFields)) {
-        setModifiedFields(new Set<string>(parsed.modifiedFields));
-      }
-      if (parsed?.language && LOCALES[parsed.language as Language]) {
-        setLanguage(parsed.language as Language);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.data) {
+          const nextData = parsed.data as CVData;
+          setData(mergeWithDefaults(nextData));
+        }
+        if (Array.isArray(parsed?.modifiedFields)) {
+          setModifiedFields(new Set<string>(parsed.modifiedFields));
+        }
+        if (parsed?.language && LOCALES[parsed.language as Language]) {
+          setLanguage(parsed.language as Language);
+        }
       }
     } catch (err) {
       console.error("Load Error:", err);
+    } finally {
+      hasHydratedRef.current = true;
     }
   }, []);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) return;
+    try {
+      const payload = {
+        data,
+        modifiedFields: Array.from(modifiedFields),
+        language
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      console.error("Auto-save Error:", err);
+    }
+  }, [data, modifiedFields, language]);
 
   useEffect(() => {
     if (isHistoryActionRef.current) return;
@@ -1815,6 +1833,7 @@ const App: React.FC = () => {
   const filteredLanguageSkills = data.languageSkills.filter(skill =>
     [skill.language, skill.comprehension, skill.speaking, skill.writing].some(hasText)
   );
+  const hasVisibleListItems = (items: string[]) => (items ?? []).some(hasText);
   const isEuropassSectionVisible = (section: keyof EuropassSectionTitles) =>
     !data.europassHiddenSections.includes(section);
   const isEuropassPersonalInfoFieldVisible = (field: keyof EuropassLabels) =>
@@ -1843,13 +1862,13 @@ const App: React.FC = () => {
     const lastName = nameParts.slice(1).join(' ');
     const europass = locale.europass;
     const europassTitles = data.europassSectionTitles;
-    const renderEuropassList = (items: string[], field: ListField, emptyLabel: string) => {
+    const renderEuropassList = (items: string[], field: ListField) => {
       const visibleItems = (items ?? [])
         .map((value, idx) => ({ value, idx }))
         .filter(item => hasText(item.value));
 
       if (visibleItems.length === 0) {
-        return <p className="text-slate-500 italic">{emptyLabel}</p>;
+        return null;
       }
 
       return (
@@ -1872,6 +1891,27 @@ const App: React.FC = () => {
         </ul>
       );
     };
+
+    const personalInfoRows = [
+      { labelField: 'fullName' as const, valueField: 'fullName' as const, personalValueField: 'fullName' as const },
+      { labelField: 'role' as const, valueField: 'role' as const, personalValueField: 'role' as const },
+      { labelField: 'location' as const, valueField: 'location' as const },
+      { labelField: 'phone' as const, valueField: 'phone' as const },
+      { labelField: 'email' as const, valueField: 'email' as const },
+      { labelField: 'nationality' as const, valueField: 'nationality' as const },
+      { labelField: 'birthDate' as const, valueField: 'birthDate' as const },
+      { labelField: 'portfolio' as const, valueField: 'portfolio' as const },
+      { labelField: 'linkedin' as const, valueField: 'linkedin' as const }
+    ];
+
+    const visiblePersonalInfoRows = personalInfoRows.filter(row =>
+      isEuropassPersonalInfoFieldVisible(row.labelField) &&
+      hasText(
+        row.personalValueField
+          ? data.europassPersonalInfoValues[row.personalValueField]
+          : (data[row.valueField] as string)
+      )
+    );
 
     switch (data.template) {
       case 'europass':
@@ -1909,7 +1949,7 @@ const App: React.FC = () => {
               )}
             </div>
 
-            {isEuropassSectionVisible('personalInfo') && (
+            {isEuropassSectionVisible('personalInfo') && visiblePersonalInfoRows.length > 0 && (
               <section className="space-y-2">
                 <Editable
                   tag="h2"
@@ -1918,26 +1958,7 @@ const App: React.FC = () => {
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
                 <div className="grid grid-cols-[140px_1fr] gap-y-1">
-                  {[
-                    { labelField: 'fullName' as const, valueField: 'fullName' as const, personalValueField: 'fullName' as const },
-                    { labelField: 'role' as const, valueField: 'role' as const, personalValueField: 'role' as const },
-                    { labelField: 'location' as const, valueField: 'location' as const },
-                    { labelField: 'phone' as const, valueField: 'phone' as const },
-                    { labelField: 'email' as const, valueField: 'email' as const },
-                    { labelField: 'nationality' as const, valueField: 'nationality' as const },
-                    { labelField: 'birthDate' as const, valueField: 'birthDate' as const },
-                    { labelField: 'portfolio' as const, valueField: 'portfolio' as const },
-                    { labelField: 'linkedin' as const, valueField: 'linkedin' as const }
-                  ]
-                    .filter(row =>
-                      isEuropassPersonalInfoFieldVisible(row.labelField) &&
-                      hasText(
-                        row.personalValueField
-                          ? data.europassPersonalInfoValues[row.personalValueField]
-                          : (data[row.valueField] as string)
-                      )
-                    )
-                    .map(row => (
+                  {visiblePersonalInfoRows.map(row => (
                       <React.Fragment key={row.valueField}>
                         <Editable
                           value={data.europassLabels[row.labelField]}
@@ -1970,7 +1991,7 @@ const App: React.FC = () => {
               </section>
             )}
 
-            {isEuropassSectionVisible('profile') && (
+            {isEuropassSectionVisible('profile') && hasText(data.summary) && (
               <section className="space-y-2">
                 <Editable
                   tag="h2"
@@ -1987,7 +2008,7 @@ const App: React.FC = () => {
               </section>
             )}
 
-            {isEuropassSectionVisible('experience') && (
+            {isEuropassSectionVisible('experience') && filteredExperiences.length > 0 && (
               <section className="space-y-2">
                 <Editable
                   tag="h2"
@@ -2027,14 +2048,11 @@ const App: React.FC = () => {
                       />
                     </div>
                   ))}
-                  {data.experiences.length === 0 && (
-                    <p className="text-slate-500 italic text-xs">{locale.ui.emptyExperience}</p>
-                  )}
                 </div>
               </section>
             )}
 
-            {isEuropassSectionVisible('education') && (
+            {isEuropassSectionVisible('education') && filteredEducation.length > 0 && (
               <section className="space-y-2">
                 <Editable
                   tag="h2"
@@ -2068,14 +2086,11 @@ const App: React.FC = () => {
                       />
                     </div>
                   ))}
-                  {data.education.length === 0 && (
-                    <p className="text-slate-500 italic text-xs">{locale.ui.emptyEducation}</p>
-                  )}
                 </div>
               </section>
             )}
 
-            {isEuropassSectionVisible('languageSkills') && (
+            {isEuropassSectionVisible('languageSkills') && filteredLanguageSkills.length > 0 && (
               <section className="space-y-2">
                 <Editable
                   tag="h2"
@@ -2125,19 +2140,12 @@ const App: React.FC = () => {
                         </td>
                       </tr>
                     ))}
-                    {data.languageSkills.length === 0 && (
-                      <tr>
-                        <td className="border border-slate-300 px-2 py-1 text-slate-500 italic" colSpan={4}>
-                          {locale.ui.emptyLanguages}
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </section>
             )}
 
-            {isEuropassSectionVisible('digitalSkills') && (
+            {isEuropassSectionVisible('digitalSkills') && hasVisibleListItems(data.digitalSkills) && (
               <section className="space-y-2">
                 <Editable
                   tag="h2"
@@ -2145,11 +2153,11 @@ const App: React.FC = () => {
                   onChange={v => handleEuropassTitleUpdate('digitalSkills', v)}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
-                {renderEuropassList(data.digitalSkills, 'digitalSkills', locale.ui.emptySkills)}
+                {renderEuropassList(data.digitalSkills, 'digitalSkills')}
               </section>
             )}
 
-            {isEuropassSectionVisible('organizationalSkills') && (
+            {isEuropassSectionVisible('organizationalSkills') && hasVisibleListItems(data.organizationalSkills) && (
               <section className="space-y-2">
                 <Editable
                   tag="h2"
@@ -2157,11 +2165,11 @@ const App: React.FC = () => {
                   onChange={v => handleEuropassTitleUpdate('organizationalSkills', v)}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
-                {renderEuropassList(data.organizationalSkills, 'organizationalSkills', locale.ui.emptySoftSkills)}
+                {renderEuropassList(data.organizationalSkills, 'organizationalSkills')}
               </section>
             )}
 
-            {isEuropassSectionVisible('professionalSkills') && (
+            {isEuropassSectionVisible('professionalSkills') && hasVisibleListItems(data.professionalSkills) && (
               <section className="space-y-2">
                 <Editable
                   tag="h2"
@@ -2169,11 +2177,11 @@ const App: React.FC = () => {
                   onChange={v => handleEuropassTitleUpdate('professionalSkills', v)}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
-                {renderEuropassList(data.professionalSkills, 'professionalSkills', locale.ui.emptySkills)}
+                {renderEuropassList(data.professionalSkills, 'professionalSkills')}
               </section>
             )}
 
-            {isEuropassSectionVisible('additionalInfo') && (
+            {isEuropassSectionVisible('additionalInfo') && hasVisibleListItems(data.additionalInfo) && (
               <section className="space-y-2">
                 <Editable
                   tag="h2"
@@ -2181,7 +2189,7 @@ const App: React.FC = () => {
                   onChange={v => handleEuropassTitleUpdate('additionalInfo', v)}
                   className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
                 />
-                {renderEuropassList(data.additionalInfo, 'additionalInfo', locale.ui.emptySoftSkills)}
+                {renderEuropassList(data.additionalInfo, 'additionalInfo')}
               </section>
             )}
           </div>

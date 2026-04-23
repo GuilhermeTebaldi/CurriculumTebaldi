@@ -29,7 +29,7 @@ import {
   Twitter,
   Settings2
 } from 'lucide-react';
-import { CVData, WorkExperience, Education, CVTemplate, SectionTitles, LanguageSkill } from './types';
+import { CVData, WorkExperience, Education, CVTemplate, SectionTitles, LanguageSkill, EuropassSectionTitles } from './types';
 import { optimizeText } from './services/geminiService';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -41,6 +41,18 @@ type Language = 'it' | 'pt' | 'en' | 'es';
 const STORAGE_KEY = 'cv_editor_data_v1';
 
 const getTemplateLabel = (template: CVTemplate) => template;
+
+const EUROPASS_SECTION_KEYS: Array<keyof EuropassSectionTitles> = [
+  'personalInfo',
+  'profile',
+  'experience',
+  'education',
+  'languageSkills',
+  'digitalSkills',
+  'organizationalSkills',
+  'professionalSkills',
+  'additionalInfo'
+];
 
 // Europass-specific defaults for CEFR language table.
 const DEFAULT_LANGUAGE_LEVELS = {
@@ -585,6 +597,24 @@ const LOCALES: Record<Language, {
   }
 };
 
+const getDefaultEuropassSectionTitles = (lang: Language): EuropassSectionTitles => {
+  const europass = LOCALES[lang].europass;
+  return {
+    personalInfo: europass.personalInfo,
+    profile: europass.profile,
+    experience: europass.experience,
+    education: europass.education,
+    languageSkills: europass.languageSkills,
+    digitalSkills: europass.digitalSkills,
+    organizationalSkills: europass.organizationalSkills,
+    professionalSkills: europass.professionalSkills,
+    additionalInfo: europass.additionalInfo
+  };
+};
+
+const isEuropassSectionKey = (value: unknown): value is keyof EuropassSectionTitles =>
+  typeof value === 'string' && EUROPASS_SECTION_KEYS.includes(value as keyof EuropassSectionTitles);
+
 const INITIAL_DATA: CVData = {
   fullName: "Guilherme Tebaldi",
   role: "Full Stack Developer & Marketing Specialist",
@@ -626,7 +656,9 @@ const INITIAL_DATA: CVData = {
   organizationalSkills: ["Gestione del tempo", "Coordinamento team"],
   professionalSkills: ["Sviluppo software", "Marketing digitale"],
   additionalInfo: ["Patente B"],
-  sectionTitles: { ...LOCALES.it.sectionTitles }
+  sectionTitles: { ...LOCALES.it.sectionTitles },
+  europassSectionTitles: getDefaultEuropassSectionTitles('it'),
+  europassHiddenSections: []
 };
 
 const isLanguageSkill = (item: any): item is LanguageSkill =>
@@ -650,6 +682,13 @@ const mergeWithDefaults = (incoming: CVData): CVData => ({
   ...INITIAL_DATA,
   ...incoming,
   sectionTitles: { ...INITIAL_DATA.sectionTitles, ...(incoming.sectionTitles ?? {}) },
+  europassSectionTitles: {
+    ...INITIAL_DATA.europassSectionTitles,
+    ...((incoming as any).europassSectionTitles ?? {})
+  },
+  europassHiddenSections: Array.isArray((incoming as any).europassHiddenSections)
+    ? (incoming as any).europassHiddenSections.filter(isEuropassSectionKey)
+    : INITIAL_DATA.europassHiddenSections,
   experiences: Array.isArray(incoming.experiences) ? incoming.experiences : INITIAL_DATA.experiences,
   education: Array.isArray(incoming.education) ? incoming.education : INITIAL_DATA.education,
   skills: Array.isArray(incoming.skills) ? incoming.skills : INITIAL_DATA.skills,
@@ -1201,6 +1240,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const titles = LOCALES[language].sectionTitles;
+    const europaDefaults = getDefaultEuropassSectionTitles(language);
     setData(prev => {
       const nextTitles = { ...prev.sectionTitles };
       (Object.keys(titles) as Array<keyof SectionTitles>).forEach(key => {
@@ -1208,7 +1248,13 @@ const App: React.FC = () => {
           nextTitles[key] = titles[key];
         }
       });
-      return { ...prev, sectionTitles: nextTitles };
+      const nextEuropassTitles = { ...prev.europassSectionTitles };
+      EUROPASS_SECTION_KEYS.forEach(key => {
+        if (!modifiedFields.has(`europass_title_${key}`)) {
+          nextEuropassTitles[key] = europaDefaults[key];
+        }
+      });
+      return { ...prev, sectionTitles: nextTitles, europassSectionTitles: nextEuropassTitles };
     });
   }, [language, modifiedFields]);
 
@@ -1223,6 +1269,27 @@ const App: React.FC = () => {
       sectionTitles: { ...prev.sectionTitles, [field]: value }
     }));
     setModifiedFields(prev => new Set(prev).add(`title_${String(field)}`));
+  };
+
+  const handleEuropassTitleUpdate = (field: keyof EuropassSectionTitles, value: string) => {
+    setData(prev => ({
+      ...prev,
+      europassSectionTitles: { ...prev.europassSectionTitles, [field]: value }
+    }));
+    setModifiedFields(prev => new Set(prev).add(`europass_title_${String(field)}`));
+  };
+
+  const toggleEuropassSectionVisibility = (section: keyof EuropassSectionTitles) => {
+    setData(prev => {
+      const hidden = new Set(prev.europassHiddenSections);
+      if (hidden.has(section)) {
+        hidden.delete(section);
+      } else {
+        hidden.add(section);
+      }
+      return { ...prev, europassHiddenSections: Array.from(hidden) };
+    });
+    setModifiedFields(prev => new Set(prev).add(`europass_hidden_${String(section)}`));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1635,6 +1702,8 @@ const App: React.FC = () => {
   const filteredLanguageSkills = data.languageSkills.filter(skill =>
     [skill.language, skill.comprehension, skill.speaking, skill.writing].some(hasText)
   );
+  const isEuropassSectionVisible = (section: keyof EuropassSectionTitles) =>
+    !data.europassHiddenSections.includes(section);
   const curriculoguiSocialItems = (isEuropass
     ? [
         { id: 'linkedin', icon: <Linkedin className="w-4 h-4 text-slate-500" />, placeholder: "Linkedin URL" },
@@ -1658,6 +1727,7 @@ const App: React.FC = () => {
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ');
     const europass = locale.europass;
+    const europassTitles = data.europassSectionTitles;
     const renderEuropassList = (items: string[], field: ListField, emptyLabel: string) => {
       if (!items || items.length === 0) {
         return <p className="text-slate-500 italic">{emptyLabel}</p>;
@@ -1713,193 +1783,265 @@ const App: React.FC = () => {
               )}
             </div>
 
-            <section className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.personalInfo}</h2>
-              <div className="grid grid-cols-[140px_1fr] gap-y-1">
-                {[
-                  { label: europass.labels.fullName, field: 'fullName', value: data.fullName, required: true },
-                  { label: europass.labels.role, field: 'role', value: data.role, required: true },
-                  { label: europass.labels.location, field: 'location', value: data.location },
-                  { label: europass.labels.phone, field: 'phone', value: data.phone },
-                  { label: europass.labels.email, field: 'email', value: data.email },
-                  { label: europass.labels.nationality, field: 'nationality', value: data.nationality },
-                  { label: europass.labels.birthDate, field: 'birthDate', value: data.birthDate },
-                  { label: europass.labels.portfolio, field: 'portfolio', value: data.portfolio },
-                  { label: europass.labels.linkedin, field: 'linkedin', value: data.linkedin }
-                ]
-                  .filter(row => row.required || (row.value ?? '').trim() !== '')
-                  .map(row => (
-                    <React.Fragment key={row.field}>
-                      <div className="font-semibold">{row.label}</div>
-                      <Editable
-                        value={row.value}
-                        onChange={v => handleUpdate(row.field as keyof CVData, v)}
-                        isExample={!modifiedFields.has(row.field)}
-                        className="break-all"
-                      />
-                    </React.Fragment>
-                  ))}
-              </div>
-            </section>
+            {isEuropassSectionVisible('personalInfo') && (
+              <section className="space-y-2">
+                <Editable
+                  tag="h2"
+                  value={europassTitles.personalInfo}
+                  onChange={v => handleEuropassTitleUpdate('personalInfo', v)}
+                  clearable={false}
+                  className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
+                />
+                <div className="grid grid-cols-[140px_1fr] gap-y-1">
+                  {[
+                    { label: europass.labels.fullName, field: 'fullName', value: data.fullName, required: true },
+                    { label: europass.labels.role, field: 'role', value: data.role, required: true },
+                    { label: europass.labels.location, field: 'location', value: data.location },
+                    { label: europass.labels.phone, field: 'phone', value: data.phone },
+                    { label: europass.labels.email, field: 'email', value: data.email },
+                    { label: europass.labels.nationality, field: 'nationality', value: data.nationality },
+                    { label: europass.labels.birthDate, field: 'birthDate', value: data.birthDate },
+                    { label: europass.labels.portfolio, field: 'portfolio', value: data.portfolio },
+                    { label: europass.labels.linkedin, field: 'linkedin', value: data.linkedin }
+                  ]
+                    .filter(row => row.required || (row.value ?? '').trim() !== '')
+                    .map(row => (
+                      <React.Fragment key={row.field}>
+                        <div className="font-semibold">{row.label}</div>
+                        <Editable
+                          value={row.value}
+                          onChange={v => handleUpdate(row.field as keyof CVData, v)}
+                          isExample={!modifiedFields.has(row.field)}
+                          className="break-all"
+                        />
+                      </React.Fragment>
+                    ))}
+                </div>
+              </section>
+            )}
 
-            <section className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.profile}</h2>
-              <Editable
-                value={data.summary}
-                onChange={v => handleUpdate('summary', v)}
-                isExample={!modifiedFields.has('summary')}
-                className="text-xs"
-              />
-            </section>
+            {isEuropassSectionVisible('profile') && (
+              <section className="space-y-2">
+                <Editable
+                  tag="h2"
+                  value={europassTitles.profile}
+                  onChange={v => handleEuropassTitleUpdate('profile', v)}
+                  clearable={false}
+                  className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
+                />
+                <Editable
+                  value={data.summary}
+                  onChange={v => handleUpdate('summary', v)}
+                  isExample={!modifiedFields.has('summary')}
+                  className="text-xs"
+                />
+              </section>
+            )}
 
-            <section className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.experience}</h2>
-              <div className="space-y-4">
-                {filteredExperiences.map(exp => (
-                  <div key={exp.id} className="space-y-1">
-                    <div className="flex justify-between gap-4">
+            {isEuropassSectionVisible('experience') && (
+              <section className="space-y-2">
+                <Editable
+                  tag="h2"
+                  value={europassTitles.experience}
+                  onChange={v => handleEuropassTitleUpdate('experience', v)}
+                  clearable={false}
+                  className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
+                />
+                <div className="space-y-4">
+                  {filteredExperiences.map(exp => (
+                    <div key={exp.id} className="space-y-1">
+                      <div className="flex justify-between gap-4">
+                        <Editable
+                          tag="h3"
+                          value={exp.role}
+                          onChange={v => updateExperience(exp.id, 'role', v)}
+                          isExample={!modifiedFields.has(`exp_${exp.id}_role`)}
+                          className="text-xs font-bold"
+                        />
+                        <Editable
+                          value={exp.period}
+                          onChange={v => updateExperience(exp.id, 'period', v)}
+                          isExample={!modifiedFields.has(`exp_${exp.id}_period`)}
+                          className="text-[10px] font-semibold text-slate-500"
+                        />
+                      </div>
                       <Editable
-                        tag="h3"
-                        value={exp.role}
-                        onChange={v => updateExperience(exp.id, 'role', v)}
-                        isExample={!modifiedFields.has(`exp_${exp.id}_role`)}
-                        className="text-xs font-bold"
+                        value={exp.company}
+                        onChange={v => updateExperience(exp.id, 'company', v)}
+                        isExample={!modifiedFields.has(`exp_${exp.id}_company`)}
+                        className="text-xs font-semibold"
                       />
                       <Editable
-                        value={exp.period}
-                        onChange={v => updateExperience(exp.id, 'period', v)}
-                        isExample={!modifiedFields.has(`exp_${exp.id}_period`)}
-                        className="text-[10px] font-semibold text-slate-500"
+                        value={exp.description}
+                        onChange={v => updateExperience(exp.id, 'description', v)}
+                        isExample={!modifiedFields.has(`exp_${exp.id}_description`)}
+                        className="text-xs"
                       />
                     </div>
-                    <Editable
-                      value={exp.company}
-                      onChange={v => updateExperience(exp.id, 'company', v)}
-                      isExample={!modifiedFields.has(`exp_${exp.id}_company`)}
-                      className="text-xs font-semibold"
-                    />
-                    <Editable
-                      value={exp.description}
-                      onChange={v => updateExperience(exp.id, 'description', v)}
-                      isExample={!modifiedFields.has(`exp_${exp.id}_description`)}
-                      className="text-xs"
-                    />
-                  </div>
-                ))}
-                {data.experiences.length === 0 && (
-                  <p className="text-slate-500 italic text-xs">{locale.ui.emptyExperience}</p>
-                )}
-              </div>
-            </section>
-
-            <section className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.education}</h2>
-              <div className="space-y-4">
-                {filteredEducation.map(edu => (
-                  <div key={edu.id} className="space-y-1">
-                    <div className="flex justify-between gap-4">
-                      <Editable
-                        tag="h3"
-                        value={edu.degree}
-                        onChange={v => updateEducation(edu.id, 'degree', v)}
-                        isExample={!modifiedFields.has(`edu_${edu.id}_degree`)}
-                        className="text-xs font-bold"
-                      />
-                      <Editable
-                        value={edu.year}
-                        onChange={v => updateEducation(edu.id, 'year', v)}
-                        isExample={!modifiedFields.has(`edu_${edu.id}_year`)}
-                        className="text-[10px] font-semibold text-slate-500"
-                      />
-                    </div>
-                    <Editable
-                      value={edu.school}
-                      onChange={v => updateEducation(edu.id, 'school', v)}
-                      isExample={!modifiedFields.has(`edu_${edu.id}_school`)}
-                      className="text-xs font-semibold"
-                    />
-                  </div>
-                ))}
-                {data.education.length === 0 && (
-                  <p className="text-slate-500 italic text-xs">{locale.ui.emptyEducation}</p>
-                )}
-              </div>
-            </section>
-
-            <section className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.languageSkills}</h2>
-              <table className="w-full border border-slate-300 text-[11px]">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.language}</th>
-                    <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.comprehension}</th>
-                    <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.speaking}</th>
-                    <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.writing}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLanguageSkills.map(skill => (
-                    <tr key={skill.id}>
-                      <td className="border border-slate-300 px-2 py-1">
-                        <Editable
-                          value={skill.language}
-                          onChange={v => updateLanguageSkill(skill.id, 'language', v)}
-                          isExample={!modifiedFields.has(`lang_${skill.id}_language`)}
-                        />
-                      </td>
-                      <td className="border border-slate-300 px-2 py-1">
-                        <Editable
-                          value={skill.comprehension}
-                          onChange={v => updateLanguageSkill(skill.id, 'comprehension', v)}
-                          isExample={!modifiedFields.has(`lang_${skill.id}_comprehension`)}
-                        />
-                      </td>
-                      <td className="border border-slate-300 px-2 py-1">
-                        <Editable
-                          value={skill.speaking}
-                          onChange={v => updateLanguageSkill(skill.id, 'speaking', v)}
-                          isExample={!modifiedFields.has(`lang_${skill.id}_speaking`)}
-                        />
-                      </td>
-                      <td className="border border-slate-300 px-2 py-1">
-                        <Editable
-                          value={skill.writing}
-                          onChange={v => updateLanguageSkill(skill.id, 'writing', v)}
-                          isExample={!modifiedFields.has(`lang_${skill.id}_writing`)}
-                        />
-                      </td>
-                    </tr>
                   ))}
-                  {data.languageSkills.length === 0 && (
-                    <tr>
-                      <td className="border border-slate-300 px-2 py-1 text-slate-500 italic" colSpan={4}>
-                        {locale.ui.emptyLanguages}
-                      </td>
-                    </tr>
+                  {data.experiences.length === 0 && (
+                    <p className="text-slate-500 italic text-xs">{locale.ui.emptyExperience}</p>
                   )}
-                </tbody>
-              </table>
-            </section>
+                </div>
+              </section>
+            )}
 
-            <section className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.digitalSkills}</h2>
-              {renderEuropassList(data.digitalSkills, 'digitalSkills', locale.ui.emptySkills)}
-            </section>
+            {isEuropassSectionVisible('education') && (
+              <section className="space-y-2">
+                <Editable
+                  tag="h2"
+                  value={europassTitles.education}
+                  onChange={v => handleEuropassTitleUpdate('education', v)}
+                  clearable={false}
+                  className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
+                />
+                <div className="space-y-4">
+                  {filteredEducation.map(edu => (
+                    <div key={edu.id} className="space-y-1">
+                      <div className="flex justify-between gap-4">
+                        <Editable
+                          tag="h3"
+                          value={edu.degree}
+                          onChange={v => updateEducation(edu.id, 'degree', v)}
+                          isExample={!modifiedFields.has(`edu_${edu.id}_degree`)}
+                          className="text-xs font-bold"
+                        />
+                        <Editable
+                          value={edu.year}
+                          onChange={v => updateEducation(edu.id, 'year', v)}
+                          isExample={!modifiedFields.has(`edu_${edu.id}_year`)}
+                          className="text-[10px] font-semibold text-slate-500"
+                        />
+                      </div>
+                      <Editable
+                        value={edu.school}
+                        onChange={v => updateEducation(edu.id, 'school', v)}
+                        isExample={!modifiedFields.has(`edu_${edu.id}_school`)}
+                        className="text-xs font-semibold"
+                      />
+                    </div>
+                  ))}
+                  {data.education.length === 0 && (
+                    <p className="text-slate-500 italic text-xs">{locale.ui.emptyEducation}</p>
+                  )}
+                </div>
+              </section>
+            )}
 
-            <section className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.organizationalSkills}</h2>
-              {renderEuropassList(data.organizationalSkills, 'organizationalSkills', locale.ui.emptySoftSkills)}
-            </section>
+            {isEuropassSectionVisible('languageSkills') && (
+              <section className="space-y-2">
+                <Editable
+                  tag="h2"
+                  value={europassTitles.languageSkills}
+                  onChange={v => handleEuropassTitleUpdate('languageSkills', v)}
+                  clearable={false}
+                  className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
+                />
+                <table className="w-full border border-slate-300 text-[11px]">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.language}</th>
+                      <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.comprehension}</th>
+                      <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.speaking}</th>
+                      <th className="border border-slate-300 px-2 py-1 text-left font-semibold">{europass.languageTable.writing}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredLanguageSkills.map(skill => (
+                      <tr key={skill.id}>
+                        <td className="border border-slate-300 px-2 py-1">
+                          <Editable
+                            value={skill.language}
+                            onChange={v => updateLanguageSkill(skill.id, 'language', v)}
+                            isExample={!modifiedFields.has(`lang_${skill.id}_language`)}
+                          />
+                        </td>
+                        <td className="border border-slate-300 px-2 py-1">
+                          <Editable
+                            value={skill.comprehension}
+                            onChange={v => updateLanguageSkill(skill.id, 'comprehension', v)}
+                            isExample={!modifiedFields.has(`lang_${skill.id}_comprehension`)}
+                          />
+                        </td>
+                        <td className="border border-slate-300 px-2 py-1">
+                          <Editable
+                            value={skill.speaking}
+                            onChange={v => updateLanguageSkill(skill.id, 'speaking', v)}
+                            isExample={!modifiedFields.has(`lang_${skill.id}_speaking`)}
+                          />
+                        </td>
+                        <td className="border border-slate-300 px-2 py-1">
+                          <Editable
+                            value={skill.writing}
+                            onChange={v => updateLanguageSkill(skill.id, 'writing', v)}
+                            isExample={!modifiedFields.has(`lang_${skill.id}_writing`)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    {data.languageSkills.length === 0 && (
+                      <tr>
+                        <td className="border border-slate-300 px-2 py-1 text-slate-500 italic" colSpan={4}>
+                          {locale.ui.emptyLanguages}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </section>
+            )}
 
-            <section className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.professionalSkills}</h2>
-              {renderEuropassList(data.professionalSkills, 'professionalSkills', locale.ui.emptySkills)}
-            </section>
+            {isEuropassSectionVisible('digitalSkills') && (
+              <section className="space-y-2">
+                <Editable
+                  tag="h2"
+                  value={europassTitles.digitalSkills}
+                  onChange={v => handleEuropassTitleUpdate('digitalSkills', v)}
+                  clearable={false}
+                  className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
+                />
+                {renderEuropassList(data.digitalSkills, 'digitalSkills', locale.ui.emptySkills)}
+              </section>
+            )}
 
-            <section className="space-y-2">
-              <h2 className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1">{europass.additionalInfo}</h2>
-              {renderEuropassList(data.additionalInfo, 'additionalInfo', locale.ui.emptySoftSkills)}
-            </section>
+            {isEuropassSectionVisible('organizationalSkills') && (
+              <section className="space-y-2">
+                <Editable
+                  tag="h2"
+                  value={europassTitles.organizationalSkills}
+                  onChange={v => handleEuropassTitleUpdate('organizationalSkills', v)}
+                  clearable={false}
+                  className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
+                />
+                {renderEuropassList(data.organizationalSkills, 'organizationalSkills', locale.ui.emptySoftSkills)}
+              </section>
+            )}
+
+            {isEuropassSectionVisible('professionalSkills') && (
+              <section className="space-y-2">
+                <Editable
+                  tag="h2"
+                  value={europassTitles.professionalSkills}
+                  onChange={v => handleEuropassTitleUpdate('professionalSkills', v)}
+                  clearable={false}
+                  className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
+                />
+                {renderEuropassList(data.professionalSkills, 'professionalSkills', locale.ui.emptySkills)}
+              </section>
+            )}
+
+            {isEuropassSectionVisible('additionalInfo') && (
+              <section className="space-y-2">
+                <Editable
+                  tag="h2"
+                  value={europassTitles.additionalInfo}
+                  onChange={v => handleEuropassTitleUpdate('additionalInfo', v)}
+                  clearable={false}
+                  className="text-xs font-bold uppercase tracking-widest border-b border-slate-300 pb-1"
+                />
+                {renderEuropassList(data.additionalInfo, 'additionalInfo', locale.ui.emptySoftSkills)}
+              </section>
+            )}
           </div>
         );
       case 'blueclassic':
@@ -3034,7 +3176,7 @@ const App: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row relative">
+    <div className="min-h-screen md:h-screen flex flex-col md:flex-row relative md:overflow-hidden">
       {/* Template Selection Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200">
@@ -3109,7 +3251,7 @@ const App: React.FC = () => {
       )}
 
       {/* Editor Sidebar */}
-      <aside className="w-full md:w-1/3 bg-slate-900 text-white p-6 overflow-y-auto no-print border-r border-slate-800 scrollbar-hide">
+      <aside className="w-full md:w-1/3 md:h-screen bg-slate-900 text-white p-6 overflow-y-auto no-print border-r border-slate-800 scrollbar-hide">
         <div className="flex items-center gap-2 mb-8 sticky top-0 bg-slate-900 z-10 py-2">
           <Sparkles className="text-yellow-400" />
           <h1 className="text-2xl font-bold">CURRICULOGUI</h1>
@@ -3252,9 +3394,35 @@ const App: React.FC = () => {
           {isEuropass ? (
             <>
               <section className="space-y-3">
+                <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">Sezioni Europass</h3>
+                <div className="space-y-2">
+                  {EUROPASS_SECTION_KEYS.map(section => {
+                    const isVisible = isEuropassSectionVisible(section);
+                    return (
+                      <div key={section} className="flex items-center gap-2 bg-slate-800 rounded-lg p-2 border border-slate-700">
+                        <input
+                          className="flex-1 bg-transparent border-none text-sm text-white outline-none"
+                          value={data.europassSectionTitles[section]}
+                          onChange={e => handleEuropassTitleUpdate(section, e.target.value)}
+                        />
+                        <button
+                          onClick={() => toggleEuropassSectionVisibility(section)}
+                          className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${
+                            isVisible ? 'bg-red-600/20 text-red-300' : 'bg-emerald-600/20 text-emerald-300'
+                          }`}
+                        >
+                          {isVisible ? locale.ui.removeTab : locale.ui.addTab}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="space-y-3">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xs uppercase font-bold text-slate-500 tracking-widest">
-                    {locale.europass.languageSkills} (A1-C2)
+                    {data.europassSectionTitles.languageSkills} (A1-C2)
                   </h3>
                   <button onClick={addLanguageSkill} className="text-blue-400"><Plus className="w-4 h-4" /></button>
                 </div>
@@ -3294,10 +3462,10 @@ const App: React.FC = () => {
               </section>
 
               {[
-                { title: locale.europass.digitalSkills, field: 'digitalSkills' },
-                { title: locale.europass.organizationalSkills, field: 'organizationalSkills' },
-                { title: locale.europass.professionalSkills, field: 'professionalSkills' },
-                { title: locale.europass.additionalInfo, field: 'additionalInfo' }
+                { title: data.europassSectionTitles.digitalSkills, field: 'digitalSkills' },
+                { title: data.europassSectionTitles.organizationalSkills, field: 'organizationalSkills' },
+                { title: data.europassSectionTitles.professionalSkills, field: 'professionalSkills' },
+                { title: data.europassSectionTitles.additionalInfo, field: 'additionalInfo' }
               ].map(list => renderListEditor(list.title, list.field as any))}
             </>
           ) : (
@@ -3314,7 +3482,7 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      <main className="flex-1 bg-gray-100 p-4 md:p-12 overflow-y-auto print-padding flex flex-col items-center gap-6 relative">
+      <main className="flex-1 md:h-screen bg-gray-100 p-4 md:p-12 overflow-y-auto print-padding flex flex-col items-center gap-6 relative">
         <div className="absolute top-4 left-4 z-30 no-print flex items-center gap-2">
           <button
             onClick={handleUndo}

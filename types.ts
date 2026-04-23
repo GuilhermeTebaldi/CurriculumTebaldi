@@ -36,6 +36,18 @@ export interface SectionTitles {
   personalInfo: string;
 }
 
+export interface EuropassSectionTitles {
+  personalInfo: string;
+  profile: string;
+  experience: string;
+  education: string;
+  languageSkills: string;
+  digitalSkills: string;
+  organizationalSkills: string;
+  professionalSkills: string;
+  additionalInfo: string;
+}
+
 export interface CVData {
   fullName: string;
   role: string;
@@ -64,4 +76,6 @@ export interface CVData {
   professionalSkills: string[];
   additionalInfo: string[];
   sectionTitles: SectionTitles;
+  europassSectionTitles: EuropassSectionTitles;
+  europassHiddenSections: Array<keyof EuropassSectionTitles>;
 }

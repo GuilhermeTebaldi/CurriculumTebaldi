@@ -39,6 +39,13 @@ declare var html2pdf: any;
 type Language = 'it' | 'pt' | 'en' | 'es';
 
 const STORAGE_KEY = 'cv_editor_data_v1';
+const MB = 1024 * 1024;
+const MAX_PDF_SIZE_BYTES = 25 * MB;
+const PROFILE_IMAGE_MAX_EDGE_PX = 1600;
+const PROFILE_IMAGE_TARGET_BYTES = 1.5 * MB;
+const PDF_QUALITY_STEPS = [0.92, 0.86, 0.8, 0.74, 0.68, 0.62, 0.56, 0.5, 0.45, 0.4];
+const PDF_SCALE_FACTORS = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.35, 0.3];
+const MIN_PDF_RENDER_SCALE = 1;
 
 const getTemplateLabel = (template: CVTemplate) => template;
 
@@ -841,6 +848,85 @@ const Editable: React.FC<{
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
+    reader.readAsDataURL(file);
+  });
+
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(new Error('Não foi possível processar a imagem.'));
+    reader.readAsDataURL(blob);
+  });
+
+const loadImageFromDataUrl = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Não foi possível abrir a imagem enviada.'));
+    image.src = src;
+  });
+
+const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    canvas.toBlob(
+      blob => {
+        if (!blob) {
+          reject(new Error('Falha ao gerar arquivo da imagem.'));
+          return;
+        }
+        resolve(blob);
+      },
+      type,
+      quality
+    );
+  });
+
+const compressProfileImage = async (file: File): Promise<string> => {
+  const sourceDataUrl = await readFileAsDataUrl(file);
+  const image = await loadImageFromDataUrl(sourceDataUrl);
+
+  const width = image.naturalWidth || image.width || 1;
+  const height = image.naturalHeight || image.height || 1;
+  const longestEdge = Math.max(width, height);
+  const resizeRatio = Math.min(1, PROFILE_IMAGE_MAX_EDGE_PX / longestEdge);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width * resizeRatio));
+  canvas.height = Math.max(1, Math.round(height * resizeRatio));
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return sourceDataUrl;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  let selectedBlob: Blob | null = null;
+  for (const quality of [0.92, 0.86, 0.8, 0.74]) {
+    const candidate = await canvasToBlob(canvas, 'image/jpeg', quality);
+    selectedBlob = candidate;
+    if (candidate.size <= PROFILE_IMAGE_TARGET_BYTES) break;
+  }
+
+  return selectedBlob ? blobToDataUrl(selectedBlob) : sourceDataUrl;
+};
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 const ProfilePhoto: React.FC<{
   src?: string;
   position?: number;
@@ -1423,14 +1509,30 @@ const App: React.FC = () => {
     setModifiedFields(prev => new Set(prev).add(`europass_hidden_field_${String(field)}`));
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+    if (!file) return;
+
+    try {
+      const optimizedDataUrl = await compressProfileImage(file);
+      setData(prev => ({
+        ...prev,
+        profileImage: optimizedDataUrl,
+        profileImagePos: 50
+      }));
+      setModifiedFields(prev => {
+        const next = new Set(prev);
+        next.add('profileImage');
+        next.add('profileImagePos');
+        return next;
+      });
+    } catch (err) {
+      console.error("Image Upload Error:", err);
+      try {
+        const fallbackDataUrl = await readFileAsDataUrl(file);
         setData(prev => ({
           ...prev,
-          profileImage: reader.result as string,
+          profileImage: fallbackDataUrl,
           profileImagePos: 50
         }));
         setModifiedFields(prev => {
@@ -1439,8 +1541,9 @@ const App: React.FC = () => {
           next.add('profileImagePos');
           return next;
         });
-      };
-      reader.readAsDataURL(file);
+      } catch (fallbackErr) {
+        console.error("Image Fallback Error:", fallbackErr);
+      }
     }
   };
 
@@ -1745,31 +1848,78 @@ const App: React.FC = () => {
         }, 3000);
       };
 
-      const baseScale = Math.max(window.devicePixelRatio || 1, 2);
-      const renderScale = Math.min(baseScale * 2, 4);
+      const baseScale = Math.max(window.devicePixelRatio || 1, 1.5);
+      const targetRenderScale = Math.min(baseScale * 1.5, 3);
+      const scaleCandidates = Array.from(
+        new Set(
+          PDF_SCALE_FACTORS
+            .map(factor => Number(Math.max(MIN_PDF_RENDER_SCALE, targetRenderScale * factor).toFixed(2)))
+        )
+      );
 
-      html2canvas(clone, {
-        scale: renderScale,
-        useCORS: true,
-        scrollX: 0,
-        scrollY: 0,
-        removeContainer: false
-      })
-        .then((canvas: HTMLCanvasElement) => {
-          const imgData = canvas.toDataURL('image/png');
-          const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-          const pdfWidth = 210;
-          const pdfHeight = 297;
-          const imgWidthPx = canvas.width;
-          const imgHeightPx = canvas.height;
-          const scale = Math.min(pdfWidth / imgWidthPx, pdfHeight / imgHeightPx);
-          const renderWidth = imgWidthPx * scale;
-          const renderHeight = imgHeightPx * scale;
-          const x = (pdfWidth - renderWidth) / 2;
-          const y = (pdfHeight - renderHeight) / 2;
-          pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight);
-          pdf.save(filename);
-        })
+      const createPdfBlob = (canvas: HTMLCanvasElement, jpegQuality: number): Blob => {
+        const imgData = canvas.toDataURL('image/jpeg', jpegQuality);
+        const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+        const pdfWidth = 210;
+        const pdfHeight = 297;
+        const imgWidthPx = canvas.width;
+        const imgHeightPx = canvas.height;
+        const fitScale = Math.min(pdfWidth / imgWidthPx, pdfHeight / imgHeightPx);
+        const renderWidth = imgWidthPx * fitScale;
+        const renderHeight = imgHeightPx * fitScale;
+        const x = (pdfWidth - renderWidth) / 2;
+        const y = (pdfHeight - renderHeight) / 2;
+        pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight, undefined, 'MEDIUM');
+        return pdf.output('blob') as Blob;
+      };
+
+      (async () => {
+        let bestCandidate: { blob: Blob; sizeBytes: number } | null = null;
+        let reachedLimit = false;
+
+        for (const renderScale of scaleCandidates) {
+          const canvas = await html2canvas(clone, {
+            scale: renderScale,
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            scrollX: 0,
+            scrollY: 0,
+            removeContainer: false
+          });
+
+          for (const jpegQuality of PDF_QUALITY_STEPS) {
+            const blob = createPdfBlob(canvas, jpegQuality);
+            const sizeBytes = blob.size;
+
+            if (!bestCandidate || sizeBytes < bestCandidate.sizeBytes) {
+              bestCandidate = { blob, sizeBytes };
+            }
+
+            if (sizeBytes <= MAX_PDF_SIZE_BYTES) {
+              bestCandidate = { blob, sizeBytes };
+              reachedLimit = true;
+              break;
+            }
+          }
+
+          canvas.width = 0;
+          canvas.height = 0;
+
+          if (reachedLimit) break;
+        }
+
+        if (!bestCandidate) {
+          throw new Error('Nenhum PDF foi gerado.');
+        }
+
+        if (bestCandidate.sizeBytes > MAX_PDF_SIZE_BYTES) {
+          console.warn(
+            `PDF acima do limite de 25 MB (gerado ${(bestCandidate.sizeBytes / MB).toFixed(2)} MB).`
+          );
+        }
+
+        downloadBlob(bestCandidate.blob, filename);
+      })()
         .catch((err: any) => {
           console.error("PDF Error:", err);
         })
